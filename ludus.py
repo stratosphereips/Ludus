@@ -144,13 +144,13 @@ class Ludus(object):
 
                 #store the information in the file
                 output = {}
-                output['tw_start'] = self.tw_start.isoformat(' ')
-                output['tw_end'] = self.tw_end.isoformat(' ')
-                output['honeypots'] = active_hp
-                output['production_ports'] = production_ports
-                output['strategy_file'] = self.strategy_file
-                output['suricata_data'] = suricata_data
-                output['volumeter_data'] = volumeter_data
+                output["tw_start"] = self.tw_start.isoformat(' ')
+                output["tw_end"] = self.tw_end.isoformat(' ')
+                output["honeypots"] = active_hp
+                output["production_ports"] = production_ports
+                output["strategy_file"] = self.strategy_file
+                output["suricata_data"] = suricata_data
+                output["volumeter_data"] = volumeter_data
 
                 #-------------------------
                 #REMOVE BEFORE PUBLISHING
@@ -168,7 +168,7 @@ class Ludus(object):
         #Asynchronous interruption
         except KeyboardInterrupt:
             #terminate Volumeter
-            #self.volumeter_client.terminate()
+            self.volumeter_client.terminate()
             print("\nInterrupted")
 
 if __name__ == '__main__':
