@@ -78,10 +78,11 @@ class Ludus(object):
         self.config_file = config_file
         self.flag = threading.Event()
         self.suricat_extractor = s_extractor.Extractor("/root/var/log/suricata/eve.json")
-        self.hp_ports = []
         self.tw_start = None
         self.read_configuration()
         self.next_call = 0
+        self.production_ports =[]
+        self.active_honeypots = []
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
@@ -100,8 +101,38 @@ class Ludus(object):
             print("Unsupported value in field 'allow' (expected boolean)! Using DEFAULT value 'False' instead.")
             self.use_suricata = False
 
+    def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
+        #close previously opened HP which we do not want anymore               
+        try:
+            for port in suggested_honeypots:
+                if port not in self.active_honeypots:
+                    close_honeypot(port, known_honeypots)
+        except TypeError:
+            #no action required
+            pass
+        #open new HP ports
+        try:
+            #open the Honeypots on suggested ports
+            for port in suggested_honeypots:
+                if port not in self.active_honeypots:
+                    open_honeypot(port,known_honeypots)   
+        except TypeError:
+            #no action required
+            pass
+
+
     def run(self):
         """Main loop"""
+        
+        #analyze the production ports
+        (self.production_ports, self.active_honeypots)=get_ports_information()
+        print "production_ports"
+        print self.production_ports
+        print "*************"
+        #get strategy
+        suggested_honeypots = get_strategy(self.production_ports,self.active_honeypots,self.strategy_file)
+        #apply strategy
+        self.apply_strategy(suggested_honeypots)
         self.tw_start = datetime.datetime.now()
         self.next_call = time.time()
         try:
@@ -112,42 +143,37 @@ class Ludus(object):
             
                 #get data from Volumeter
                 volumeter_data = self.volumeter_client.get_data_and_reset()
+                print "## volumeter data ##"
+                print volumeter_data
+                print "#################"
                 #get data from Suricata-Extractor
                 suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
                 
-                #check if there are any changes in configuration file
+                old_strategy = self.strategy_file
+                #check if there is any change configuration
                 self.read_configuration()
 
                 #get the information about ports in use
                 (production_ports, active_hp) = get_ports_information()
+                print "production_ports"
+                print self.production_ports
+                print "*************"
                 
-                #update honeypot distribution following the GT strategy        
-                self.hp_ports = get_strategy(production_ports,active_hp,self.strategy_file)
+                #do we need to change the defence_strategy?
+                if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
+                    #update the settings
+                    self.active_honeypots = active_hp
+                    self.production_ports = production_ports
+                    #get strategy
+                    suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
+                    apply_strategy(suggested_honeypots)
                 
-                #close previously opened HP which we do not want anymore               
-                try:
-                    for port in active_hp:
-                        if port not in self.hp_ports:
-                            close_honeypot(port, known_honeypots)
-                except TypeError:
-                    #no action required
-                    pass
-                #open new HP ports
-                try:
-                    #open the Honeypots on suggested ports
-                    for port in self.hp_ports:
-                        if port not in active_hp:
-                            open_honeypot(port,known_honeypots)   
-                except TypeError:
-                    #no action required
-                    pass
-
                 #store the information in the file
                 output = {}
                 output["tw_start"] = self.tw_start.isoformat(' ')
                 output["tw_end"] = self.tw_end.isoformat(' ')
-                output["honeypots"] = active_hp
-                output["production_ports"] = production_ports
+                output["honeypots"] = self.active_honeypots
+                output["production_ports"] = self.production_ports
                 output["strategy_file"] = self.strategy_file
                 output["suricata_data"] = suricata_data
                 output["volumeter_data"] = volumeter_data
