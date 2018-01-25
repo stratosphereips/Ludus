@@ -1,0 +1,21 @@
+# This is a strategy for the defender and the attacker.
+# After the Chance decision, the defender chooses probabilistically actions (probability sum to one).
+# Similarly, after the defender's action, attacker chooses probabilitically his actions in the information set (his probabilities sum also to one).
+# Explanation of the columns and their formants:
+# defender-action is in format N[port1, port2, ..., portn]:D[port1, port2, ...], where ports after N are nature ports, and ports after D are honeypot ports
+# defender-action-probability is value [0,1]
+# attacker-action is in format A<port>, where port is the chosen port to attack by the attacker.
+# attacker-action-probability is the probability that attacker chooses this action
+# defenders-utility is the utility that the defender obtains in this leaf of the game-tree.
+defender-action, defender-action-probability, attacker-action, attacker-action-probability, defenders-utility
+N[80, 443, 8000]:D[135], 1.0, A80, 1.0, (-2250.0, 2250.0)
+N[8008]:D[80], 1.0, A80, 0.9999999999999999, (-0.05500000000000001, 0.05500000000000001)
+N[80, 8008]:D[443], 1.0, A80, 1.0, (-2250.0, 2250.0)
+N[443]:D[80], 1.0, A80, 1.0, (-0.05500000000000001, 0.05500000000000001)
+N[139]:D[80], 1.0, A80, 1.0, (-0.05500000000000001, 0.05500000000000001)
+N[80, 443]:D[], 1.0, A80, 1.0, (-2250.0, 2250.0)
+N[80]:D[443], 0.12938014818499893, A80, 1.0, (-2250.0, 2250.0)
+N[80]:D[139], 0.033697884727983116, A80, 1.0, (-2250.0, 2250.0)
+N[80]:D[8000], 0.8091441886170719, A80, 0.9999999999999999, (-2250.0, 2250.0)
+N[80]:D[8008], 0.02777777846994599, A80, 0.9999999999999999, (-2250.0, 2250.0)
+N[8000]:D[80], 1.0, A80, 0.9999999999999999, (-0.05500000000000001, 0.05500000000000001)
