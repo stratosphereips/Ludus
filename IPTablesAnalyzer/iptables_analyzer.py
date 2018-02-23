@@ -65,6 +65,15 @@ def process_honeypots(verbose=0):
 						if verbose > 0:
 							print "\tPORT: {}, TARPIT, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[3], rule[0],rule[1])
 						hp_ports.append(rule[9])
+	#check if haas is active
+	chains = subprocess.Popen('iptables -vnL -t nat | grep DNAT', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+	rules = parse_DNAT_chain(chains[0])
+	if rules: #check if there exists at elast one rule
+		for rule in rules:
+			if  "haas" in rule:
+				if verbose > 0:
+					print "\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1])
+				hp_ports.append(rule[10])
 	return hp_ports						
 
 """
@@ -121,9 +130,10 @@ def process_production_ports(verbose=0):
 	rules = parse_DNAT_chain(chains[0])
 	if rules: #check if there exists at elast one rule
 		for rule in rules:
-			if verbose > 0:
-				print "\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1])
-			production_ports.append(rule[10])
+			if not "haas" in rule:
+				if verbose > 0:
+					print "\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1])
+				production_ports.append(rule[10])
 	return production_ports
 	
 def parse_DNAT_chain(chain):
