@@ -79,8 +79,9 @@ class defender():
             # If there is no match, is the last one
             return sorted_current_honeypot_dict[-1][0]
         except KeyError:
-            print production_ports
-            print 'We never saw that combination of production ports {}. Sorry we can not help you now.'.format(production_ports)
+            #print production_ports
+            #print 'We never saw that combination of production ports {}. Sorry we can not help you now.'.format(production_ports)
+            return None
 
 def read_data(file, NewDefender, debug=0):
     f = open(file)

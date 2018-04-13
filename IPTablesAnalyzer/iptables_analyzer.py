@@ -181,13 +181,13 @@ def process_accepted_ports(verbose=0):
 def get_output(verbose=0):
 	output = {}
 	for port in process_honeypots(verbose):
-		output[port] = 'honeypot-turris'
+		output[int(port)] = 'honeypot-turris'
 	#get data from production ports (ports being redirected to the locat network)
 	for port in process_production_ports(verbose):
-		output[port] = 'production'
+		output[int(port)] = 'production'
 	#get data from accepted ports
 	for port in process_accepted_ports(verbose):
-		output[port] = 'accepted'
+		output[int(port)] = 'accepted'
 	return output
 
 if __name__ == '__main__':

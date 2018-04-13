@@ -55,7 +55,7 @@ class Port(object):
         #update values
         self.packets += new_packets
         self.bytes += new_bytes
-        print "[{}] New connection destroyed in port {} \tPKTS: {}, BYTES: {}".format(timestamp, self.id, self.packets,self.bytes)
+        #print "[{}] New connection destroyed in port {} \tPKTS: {}, BYTES: {}".format(timestamp, self.id, self.packets,self.bytes)
         #erase buffer
         self.tcp_buffer = 0
 
@@ -65,7 +65,7 @@ class Port(object):
 
     def increase_buffer(self, timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
-        print "[{}] Active connection in port {} - buffer incremented".format(timestamp, self.id)
+        #print "[{}] Active connection in port {} - buffer incremented".format(timestamp, self.id)
         self.buffer +=1
 
     def __str__(self):
@@ -107,14 +107,14 @@ class Counter(multiprocessing.Process):
             if event.lower() == 'destroy':
                 src_ip = parts[3].strip("src=")
                 dst_ip = parts[4].strip("dst=")
-                sport = parts[5].strip("sport=")
-                dport = parts[6].strip("dport=")
+                sport = int(parts[5].strip("sport="))
+                dport = int(parts[6].strip("dport="))
                 #[UNREPLIED] event
                 if parts[9].strip("[]").lower() == "unreplied":
-                    pkts = int(parts[7].strip("packtets="))
+                    pkts = int(parts[7].strip("packets="))
                     data_bytes = int(parts[8].strip("bytes="))
                 else:
-                    pkts = int(parts[7].strip("packtets=")) +  int(parts[13].strip("packtets="))
+                    pkts = int(parts[7].strip("packets=")) +  int(parts[13].strip("packets="))
                     data_bytes = int(parts[8].strip("bytes=")) + int(parts[14].strip("bytes="))
                 #store the vlaues in the dict
                 if dst_ip == self.router_ip:
@@ -160,7 +160,7 @@ class Counter(multiprocessing.Process):
             dst_ip = parts[4].strip("dst=")
             if dst_ip == self.router_ip:           
                 if event.lower() == 'destroy':
-                    self.icmp.add_values(int(parts[8].strip("packtets=")) +  int(parts[15].strip("packtets=")), int(parts[8].strip("packtets=")) +  int(parts[15].strip("packtets=")),timestamp)
+                    self.icmp.add_values(int(parts[8].strip("packets=")) +  int(parts[15].strip("packets=")), int(parts[8].strip("packets=")) +  int(parts[15].strip("packets=")),timestamp)
                 else:
                     self.icmp.increase_buffer(timestamp)
         else:
@@ -267,7 +267,6 @@ class Volumeter(object):
                 exit_flag.set()
                 process.terminate()
                 counter.join()
-        print("Leaving Volumeter")
 
 if __name__ == '__main__':
     #get parameters

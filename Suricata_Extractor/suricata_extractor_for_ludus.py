@@ -64,6 +64,9 @@ class TimeWindow(object):
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
         """
+        def get_B_class_network(ip):
+            splitted = ip.split(".")
+            return "{}.{}".format(splitted[0], splitted[1]) 
         # Categories
         if category == '':
             try:
@@ -86,15 +89,17 @@ class TimeWindow(object):
         except KeyError:
             self.signatures[signature] = 1
         # Srcip
+        #extract B class network (mask 255.255.0.0)
+
         try:
-            self.src_ips[src_ip] += 1
+            self.src_ips[get_B_class_network(src_ip)] += 1
         except KeyError:
-            self.src_ips[src_ip] = 1
+            self.src_ips[get_B_class_network(src_ip)] = 1
         # Dstip
         try:
-            self.dst_ips[dst_ip] += 1
+            self.dst_ips[get_B_class_network(dst_ip)] += 1
         except KeyError:
-            self.dst_ips[dst_ip] = 1
+            self.dst_ips[get_B_class_network(dst_ip)] = 1
         # Srcport
         try:
             self.src_ports[srcport] += 1
@@ -167,8 +172,8 @@ class TimeWindow(object):
         data["# Severity 4"] = self.severities[self.severities.keys()[3]]
         data["Alerts/DstPort"] = self.dst_ports
         data["Alerts/SrcPort"] = self.src_ports
-        data["Alerts/SrcIP"] = self.src_ips
-        data["Alers/DstIP"] = self.dst_ips
+        data["Alerts/SrcBClassNet"] = self.src_ips
+        data["Alerts/DstBClassNet"] = self.dst_ips
         data["Per SrcPort"] = self.src_ports
         return data
 
@@ -268,6 +273,7 @@ class Extractor(object):
         self.tw_archive = {}
         self.timewindow = None
         self.line_number = 0
+        self.last_timestamp = None
         self.file = "/root/var/log/suricata/eve.json"
 
     def process_line(self, line, timewindow):
@@ -277,74 +283,78 @@ class Extractor(object):
         json_line = json.loads(line)
         #check if we are in the timewindow
         line_timestamp = datetime.strptime(json_line["timestamp"].split('+')[0], timeStampFormat)
-        if line_timestamp > timewindow.start and line_timestamp <= timewindow.end:
-            if "alert" not in json_line["event_type"] and "flow" not in json_line["event_type"]:
-                return False
-            """
-            if args.dstnet and args.dstnet not in json_line['dest_ip']:
-                return False
-            """
-            # forget the timezone for now with split
-            try:
-                col_time = json_line["timestamp"].split('+')[0]
-            except KeyError:
-                col_time = ''
-            try:
-                col_category = json_line["alert"]["category"]
-            except KeyError:
-                col_category = ''
-            try:
-                col_severity = json_line["alert"]["severity"]
-            except KeyError:
-                col_severity = ''
-            try:
-                col_signature = json_line["alert"]['signature']
-            except KeyError:
-                col_signature = ''
-            try:
-                col_srcip = json_line['src_ip']
-            except KeyError:
-                col_srcip = ''
-            try:
-                col_dstip = json_line['dest_ip']
-            except KeyError:
-                col_dstip = ''
-            try:
-                col_srcport = json_line['src_port']
-            except KeyError:
-                col_srcport = ''
-            try:
-                col_dstport = json_line['dest_port']
-            except KeyError:
-                col_dstport = ''
+        if line_timestamp > timewindow.start:
+            if line_timestamp <= timewindow.end:
+                if "alert" not in json_line["event_type"] and "flow" not in json_line["event_type"]:
+                    return False
+                """
+                if args.dstnet and args.dstnet not in json_line['dest_ip']:
+                    return False
+                """
+                # forget the timezone for now with split
+                try:
+                    col_time = json_line["timestamp"].split('+')[0]
+                except KeyError:
+                    col_time = ''
+                try:
+                    col_category = json_line["alert"]["category"]
+                except KeyError:
+                    col_category = ''
+                try:
+                    col_severity = json_line["alert"]["severity"]
+                except KeyError:
+                    col_severity = ''
+                try:
+                    col_signature = json_line["alert"]['signature']
+                except KeyError:
+                    col_signature = ''
+                try:
+                    col_srcip = json_line['src_ip']
+                except KeyError:
+                    col_srcip = ''
+                try:
+                    col_dstip = json_line['dest_ip']
+                except KeyError:
+                    col_dstip = ''
+                try:
+                    col_srcport = json_line['src_port']
+                except KeyError:
+                    col_srcport = ''
+                try:
+                    col_dstport = json_line['dest_port']
+                except KeyError:
+                    col_dstport = ''
 
-            # Get the time window object
-            if 'alert' in json_line["event_type"]:
-                timewindow.add_alert(col_category, col_severity, col_signature, col_srcip, col_dstip, col_srcport, col_dstport)
-            elif 'flow' in json_line["event_type"]:
-                try:
-                    col_proto = json_line["proto"]
-                except KeyError:
-                    col_proto = ''
-                try:
-                    col_bytes_toserver = json_line["flow"]["bytes_toserver"]
-                except KeyError:
-                    col_bytes_toserver = ''
-                try:
-                    col_bytes_toclient = json_line["flow"]["bytes_toclient"]
-                except KeyError:
-                    col_bytes_toclient = ''
-                timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient)
+                # Get the time window object
+                if 'alert' in json_line["event_type"]:
+                    timewindow.add_alert(col_category, col_severity, col_signature, col_srcip, col_dstip, col_srcport, col_dstport)
+                elif 'flow' in json_line["event_type"]:
+                    try:
+                        col_proto = json_line["proto"]
+                    except KeyError:
+                        col_proto = ''
+                    try:
+                        col_bytes_toserver = json_line["flow"]["bytes_toserver"]
+                    except KeyError:
+                        col_bytes_toserver = ''
+                    try:
+                        col_bytes_toclient = json_line["flow"]["bytes_toclient"]
+                    except KeyError:
+                        col_bytes_toclient = ''
+                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient)
+            else: #we are out of TimeWindow
+                self.last_timestamp = line_timestamp
+                print("Out of TW")
                 
     def get_data(self, tw_start, tw_end):
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
         counter = 0;
-        print "Starting at line:{}".format(self.line_number)
+        print("Starting at line:{}".format(self.line_number))
         with open(self.file) as lines:
             for line in islice(lines, self.line_number, None): #skip the lines we already inspected
                 self.process_line(line,self.timewindow)
                 counter+=1
         self.line_number += counter
-        print "Number of processed lines:{}".format(counter)
+        print("Number of processed lines:{}".format(counter))
         return self.timewindow.get_data_as_dict()

@@ -71,9 +71,12 @@ class Volumeter_client(object):
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
 		self.socket.sendall("TERMINATE")
-		data = self.socket.recv(1024)
-		#print len(data)
-		self.socket.close()
+		data = None
+		try:
+			data = self.socket.recv(1024)
+			self.socket.close()
+		except socket.error:
+			print("DONE")
 		return data
 		
 if __name__ == '__main__':
