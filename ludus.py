@@ -209,7 +209,7 @@ class Ludus(object):
         self.next_call = time.time()
         try:
             while not self.flag.wait(timeout=(self.next_call +self.tw_length) - time.time()):
-                print("-------start: {}-------".format(datetime.datetime.now()))
+                print('-------start: {}-------'.format(datetime.datetime.now()))
                 self.next_call+= self.tw_length #this helps to avoid drifting in time windows
                 self.tw_end = datetime.datetime.now()
             
