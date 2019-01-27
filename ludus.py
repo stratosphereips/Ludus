@@ -1,3 +1,25 @@
+#!/usr/bin/env python3
+#  Copyright (C) 2017  Sebastian Garcia, Ondrej Lukas
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# This file is part of the Stratosphere Linux IPS project. https://stratosphereips.org
+
+# Author:
+# Ondrej Lukas, ondrej.lukas95@gmail.com    
+
 import time, threading, datetime
 import sys
 import json
@@ -187,7 +209,7 @@ class Ludus(object):
         self.next_call = time.time()
         try:
             while not self.flag.wait(timeout=(self.next_call +self.tw_length) - time.time()):
-                print "-------start: {}-------".format(datetime.datetime.now())
+                print("-------start: {}-------".format(datetime.datetime.now()))
                 self.next_call+= self.tw_length #this helps to avoid drifting in time windows
                 self.tw_end = datetime.datetime.now()
             
@@ -259,7 +281,7 @@ if __name__ == '__main__':
         print("Error while testing if suricata is running.")
     else:
         if(len(out) == 0): #no running suricata
-            print("Suricata is required for running Ludus. Please start suricata and restart ludus.py")
+            prnt("Suricata is required for running Ludus. Please start suricata and restart ludus.py")
         else: #its ok, proceed
             #start Volumeter
             v = vol.Volumeter(ludus.router_ip, args.volumeter_port)
