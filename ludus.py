@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #  Copyright (C) 2017  Sebastian Garcia, Ondrej Lukas
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -268,9 +268,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     #start the tool
-    print ".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'"
-    print "\nVersion %s\n" % VERSION
-    print "Started on {}\n".format(datetime.datetime.now())
+    print(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'")
+    print("\nVersion %s\n".format(VERSION))
+    print("Started on {}\n".format(datetime.datetime.now()))
 
 
     #check if suricata is running
