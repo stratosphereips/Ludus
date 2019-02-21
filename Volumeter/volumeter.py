@@ -252,7 +252,7 @@ class Volumeter(object):
         #create new process
         counter = Counter(queue, self.address, self.port,exit_flag)
         #start it
-        print("Staring counter:{}", datetime.datetime.now())
+        print("Staring counter:{}".format(datetime.datetime.now()))
         counter.start()
 
         #yet another process

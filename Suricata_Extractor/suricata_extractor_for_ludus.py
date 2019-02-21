@@ -274,7 +274,7 @@ class Extractor(object):
         self.timewindow = None
         self.line_number = 0
         self.last_timestamp = None
-        self.file = "/root/var/log/suricata/eve.json"
+        self.file = "/var/log/suricata/eve.json"
 
     def process_line(self, line, timewindow):
         """
