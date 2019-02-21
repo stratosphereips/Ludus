@@ -8,14 +8,36 @@ import Strategizer.strategy_generator as generator
 import IPTablesAnalyzer.iptables_analyzer
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
 from Volumeter.volumeter_client import Volumeter_client
-from ConfigParser import SafeConfigParser
+import configparser
+from configparser import NoOptionError
 import Volumeter.volumeter as vol
 from multiprocessing import Process
 import locking
+import zmq
+import msgpack
 
-VERSION = 0.5
+VERSION = 0.6
 
 known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']
+
+
+class Sendline():
+    TOPIC=b"sentinel/collect/ludus"
+
+    def __init__(self, target="ipc:///tmp/sentinel_pull.sock"):
+        self.zmqcontext = zmq.Context.instance()
+        self.zmqsocket = self.zmqcontext.socket(zmq.PUSH)
+        self.zmqsocket.connect(target)
+    def sendline(self,data):
+        packed = msgpack.dumps(data)
+        self.zmqsocket.send_multipart([self.TOPIC, packed])
+    def close(self):
+        self.zmqcontext.destroy()
+
+
+
+
+
 
 def open_honeypot(port, known_honeypots, protocol='tcp'):
     if port in known_honeypots:
@@ -79,7 +101,7 @@ class Ludus(object):
     def __init__(self, volumeter_port,config_file='/etc/ludus/ludus.config'):
         
         self.volumeter_client = Volumeter_client(volumeter_port)
-        self.config_parser = parser = SafeConfigParser()
+        self.config_parser = parser = configparser.ConfigParser()
         self.config_file = config_file
         self.flag = threading.Event()
         self.suricat_extractor = s_extractor.Extractor("/root/var/log/suricata/eve.json")
@@ -95,6 +117,9 @@ class Ludus(object):
         self.json_file = self.config_parser.get('output', 'filename')
         try:
             self.tw_length = self.config_parser.getint('settings', 'timeout')
+        except NoOptionError:
+            print("Option 'timeout' not found! Using DEFAULT value 60 insted.")
+            self.tw_length = 60
         except ValueError:
             print("Unsupported value in field 'timeout' (expected int)! Using DEFAULT value 60 insted.")
             self.tw_length = 60
@@ -152,8 +177,8 @@ class Ludus(object):
                 tcp_ports[p] = {"type":"Unknown","bytes":0, "packets":0, "flows":-1, "#Alerts":0}
         #update volumes
         for p in volumeter_data['tcp'].keys():
-            tcp_ports[int(p)]["bytes"] = volumeter_data["tcp"][p]["bytes"]
-            tcp_ports[int(p)]["packets"] = volumeter_data["tcp"][p]["packets"]
+            tcp_ports[p]["bytes"] = volumeter_data["tcp"][p]["bytes"]
+            tcp_ports[p]["packets"] = volumeter_data["tcp"][p]["packets"]
         #update alerts
         for p in suricata_data["Alerts/DstPort"].keys():
             tcp_ports[p]["#Alerts"] = suricata_data["Alerts/DstPort"][p]
@@ -187,7 +212,7 @@ class Ludus(object):
         self.next_call = time.time()
         try:
             while not self.flag.wait(timeout=(self.next_call +self.tw_length) - time.time()):
-                print "-------start: {}-------".format(datetime.datetime.now())
+                print("-------start: {}-------".format(datetime.datetime.now()))
                 self.next_call+= self.tw_length #this helps to avoid drifting in time windows
                 self.tw_end = datetime.datetime.now()
             
@@ -226,8 +251,53 @@ class Ludus(object):
                     s = json.dumps(output)
                     fp.write(s+'\n')
                 """
-                locking.save_data(json.dumps(output), self.json_file)
+                #locking.save_data(json.dumps(output), self.json_file)
                 #move TW
+
+                #send 
+
+
+                testdata ={
+                    "timestamp": "2011/12/22 13:14:15.654321+0230",
+                    "GameStrategyFileName": "strategy",
+                    'honeypots': [22],
+                    'production_ports': [5900, 902, 903],
+                    "alerts":{
+                        "Alerts/DstBClassNet": {"123.456.789.101": 31, "8.8.8.8":15},
+                        "Alerts/SrcBClassNet": {"1.1.1.1":3},
+                        "# Severity 1": 9999,
+                        "# Severity 2": 7123,
+                        "# Severity 3": 8712,
+                        "# Severity 4": 651468,
+                        "# Uniq Signatures": 6584994,
+                        "Alerts Categories":{
+                                "Attempted Administrator Privilege Gain":11,
+                                "Executable Code was Detected": 7,
+                                "A TCP Connection was Detected": 9,
+                                "Potential Corporate Privacy Violation": 6,
+                                "Attempt to Login By a Default Username and Password": 3
+                        }
+                    },
+                    "PortInfo":{
+                        "TCP":{
+                            "22": {"type": "Honeypot", "bytes": 31, "Packets": 392, "Flows": 7896, "#Alerts": 78945},
+                            "80": {"type": "Production", "bytes": 33, "Packets": 777, "Flows": 1889, "#Alerts": 56432}
+                        },
+                        "UDP":{
+                            "32": {"type": "Honeypot", "bytes": 1203, "Packets": 64312, "Flows": 16854, "#Alerts": 87964},
+                            "80": {"type": "Production", "bytes": 999, "Packets": 83613, "Flows": 7861, "#Alerts": 45623}
+                        }
+                    }
+                }
+
+
+
+
+                s=Sendline() #na zacatku zavolas tohle
+
+                s.sendline(testdata) #potom takhle odesilas data
+
+                s.close() #na konci zavolas tohle.
                 self.tw_start = self.tw_end
                 print("TW------end: {}--------".format(datetime.datetime.now()))            
         
@@ -241,14 +311,14 @@ if __name__ == '__main__':
 
     # Parse the parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.conf')
+    parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
     parser.add_argument('-p', '--volumeter_port', help='Port to listen on to get data from Volumeter', action='store', default=53333, required=False, type=int)
     args = parser.parse_args()
     
     #start the tool
-    print ".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'"
-    print "\nVersion %s\n" % VERSION
-    print "Started on {}\n".format(datetime.datetime.now())
+    print(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'")
+    print(f"\nVersion {VERSION}\n")
+    print("Started on {}\n".format(datetime.datetime.now()))
 
 
     #check if suricata is running

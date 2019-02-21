@@ -30,6 +30,7 @@ import socket
 import os
 import multiprocessing
 from multiprocessing import Queue
+import pickle
 
 def default(o):
     return o._asdict()
@@ -191,7 +192,7 @@ class Counter(multiprocessing.Process):
             return data
         elif msg.lower() == 'get_data_and_reset':
             #get data first
-            response = json.dumps(self.create_JSON())
+            response = pickle.dumps(self.create_JSON())
             #reset counters
             self.reset_counters()
             return response
@@ -213,10 +214,10 @@ class Counter(multiprocessing.Process):
                 #do we have a connection?
                 try:
                     c, addr = self.socket.accept()
-                    msg = c.recv(1024)
+                    msg = c.recv(1024).decode()
                     if msg:
                         response = self.process_msg(msg)
-                        print "MSG: '{}'".format(msg)
+                        print("MSG: '{}'".format(msg))
                         c.send(response)
                         c.close()
                         if(response.lower() == "terminating"):
@@ -256,14 +257,15 @@ class Volumeter(object):
 
         #yet another process
         process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        #result = subprocess.run('conntrack -E -o timestamp', stdout=subprocess.PIPE)
 
         #***MAIN LOOP***
         while not exit_flag.is_set():
             try:
-                for line in process.stdout.readline().split('\n'):
-                    queue.put(line)
+                for line in process.stdout:
+                    queue.put(line.decode('utf-8'))
             except KeyboardInterrupt:
-                print "\nInterrupting volumeter"
+                print("\nInterrupting volumeter")
                 exit_flag.set()
                 process.terminate()
                 counter.join()
@@ -274,4 +276,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
     parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
-    main(args.address,args.port)
+    process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    while True:
+        for line in process.stdout:
+            print(line.decode('utf-8'))

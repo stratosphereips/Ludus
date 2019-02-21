@@ -24,6 +24,7 @@
 import argparse
 import socket
 import json
+import pickle
 
 class Volumeter_client(object):
 	"""	Simple client for controling Volumeter
@@ -41,9 +42,9 @@ class Volumeter_client(object):
 		"""Sends signal to get data"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
-		self.socket.sendall('GET_DATA')
+		self.socket.sendall('GET_DATA'.encode())
 		data = self.socket.recv(1024)
-		print data
+		print(data)
 		self.socket.close()
 		return json.loads(data)
 
@@ -51,7 +52,7 @@ class Volumeter_client(object):
 		"""Send signal to reset the counters"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
-		self.socket.sendall("RESET")
+		self.socket.sendall("RESET".encode())
 		ret = self.socket.recv(1024)
 		self.socket.close()
 		return ret
@@ -60,17 +61,17 @@ class Volumeter_client(object):
 		"""Sends signal to get data and reset counters afterwards"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
-		self.socket.sendall("GET_DATA_AND_RESET")
+		self.socket.sendall("GET_DATA_AND_RESET".encode())
 		data = self.socket.recv(1024)
 		#print len(data)
 		self.socket.close()
-		return json.loads(data)
+		return pickle.loads(data)
 	
 	def terminate(self):
 		"""Sends signal to the Volumeter to terminate"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
-		self.socket.sendall("TERMINATE")
+		self.socket.sendall("TERMINATE".encode())
 		data = None
 		try:
 			data = self.socket.recv(1024)
@@ -92,5 +93,5 @@ if __name__ == '__main__':
 	
 	s.connect((host, args.port))
 	s.sendall(args.command)
-	print s.recv(1024)
+	print(s.recv(1024))
 	s.close()

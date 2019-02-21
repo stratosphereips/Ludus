@@ -52,7 +52,7 @@ class defender():
             self.defenders_actions[production_ports] = honeypot_dict
 
     def print_info(self):
-        print 'Amount of diff prod ports: {}'.format(len(self.defenders_actions))
+        print('Amount of diff prod ports: {}'.format(len(self.defenders_actions)))
         #print 'Production ports: {}'.format(self.defenders_actions.keys())
         #print 'Honeypot ports: {}'.format(self.defenders_actions.values())
 
@@ -68,13 +68,13 @@ class defender():
             #print sorted_current_honeypot_dict
             probability = random.uniform(0, 1)
             if debug > 3:
-                print 'Random Number: {}'.format(probability)
+                print('Random Number: {}'.format(probability))
             for honeypot_tuple in sorted_current_honeypot_dict:
                 if debug > 3:
-                    print 'Trying with port {}, which has prob {}'.format(honeypot_tuple[0], honeypot_tuple[1])
+                    print('Trying with port {}, which has prob {}'.format(honeypot_tuple[0], honeypot_tuple[1]))
                 if probability < float(honeypot_tuple[1]):
                     if debug > 3:
-                        print 'Match the random number {} with the port {}'.format(probability, honeypot_tuple)
+                        print('Match the random number {} with the port {}'.format(probability, honeypot_tuple))
                     return honeypot_tuple[0]
             # If there is no match, is the last one
             return sorted_current_honeypot_dict[-1][0]
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if not args.file:
-        print 'Error. You should provide a strategy file with -f'
+        print('Error. You should provide a strategy file with -f')
         sys.exit()
     # Create the defender object
     NewDefender = defender()
@@ -139,12 +139,12 @@ if __name__ == '__main__':
     try:
         production_ports = ','.join(map(str, sorted(map(int, temp_production_ports.split(',')), reverse=False)))
     except ValueError:
-        print 'Sorry, only integers for the ports'
+        print('Sorry, only integers for the ports')
         sys.exit()
 
     # Get the honeyport port
     honeypot_port = NewDefender.get_honeypot_ports(production_ports,args.debug)
-    print 'The honeypot port selected for you is: {}'.format(honeypot_port)
+    print('The honeypot port selected for you is: {}'.format(honeypot_port))
 
 
 

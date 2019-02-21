@@ -149,10 +149,10 @@ class TimeWindow(object):
         data = {}
         data["Alerts Categories"] = self.categories
         data["# Uniq Signatures"] = len(self.signatures)
-        data["# Severity 1"] = self.severities[self.severities.keys()[0]]
-        data["# Severity 2"] = self.severities[self.severities.keys()[1]]
-        data["# Severity 3"] = self.severities[self.severities.keys()[2]]
-        data["# Severity 4"] = self.severities[self.severities.keys()[3]]
+        data["# Severity 1"] = self.severities[list(self.severities)[0]]
+        data["# Severity 2"] = self.severities[list(self.severities)[1]]
+        data["# Severity 3"] = self.severities[list(self.severities)[2]]
+        data["# Severity 4"] = self.severities[list(self.severities)[3]]
         data["Alerts/DstPort"] = self.dst_ports
         data["Alerts/SrcPort"] = self.src_ports
         data["Alerts/SrcIP"] = self.src_ips
@@ -166,10 +166,10 @@ class TimeWindow(object):
         data = {}
         data["Alerts Categories"] = self.categories
         data["# Uniq Signatures"] = len(self.signatures)
-        data["# Severity 1"] = self.severities[self.severities.keys()[0]]
-        data["# Severity 2"] = self.severities[self.severities.keys()[1]]
-        data["# Severity 3"] = self.severities[self.severities.keys()[2]]
-        data["# Severity 4"] = self.severities[self.severities.keys()[3]]
+        data["# Severity 1"] = self.severities[list(self.severities)[0]]
+        data["# Severity 2"] = self.severities[list(self.severities)[1]]
+        data["# Severity 3"] = self.severities[list(self.severities)[2]]
+        data["# Severity 4"] = self.severities[list(self.severities)[3]]
         data["Alerts/DstPort"] = self.dst_ports
         data["Alerts/SrcPort"] = self.src_ports
         data["Alerts/SrcBClassNet"] = self.src_ips
@@ -205,10 +205,10 @@ class TimeWindow(object):
         return self.final_count_per_dst_ip
 
     def __repr__(self):
-        return 'TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[self.severities.keys()[0]], self.severities[self.severities.keys()[1]], self.severities[self.severities.keys()[2]], self.severities[self.severities.keys()[3]])
+        return 'TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]])
 
     def printit(self):
-        print 'TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[self.severities.keys()[0]], self.severities[self.severities.keys()[1]], self.severities[self.severities.keys()[2]], self.severities[self.severities.keys()[3]])
+        print('TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]]))
 
 def roundTime(dt=None, date_delta=timedelta(minutes=1), to='average'):
     """

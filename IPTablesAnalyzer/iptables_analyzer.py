@@ -21,9 +21,14 @@ def parse_from_line(string):
 
 def process_honeypots(verbose=0):
 	if verbose > 0:
-		print "ACTIVE HONEYPOT PORTS:"
-	chains = subprocess.Popen('iptables -vnL -t nat', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	input_list = chains[0].split("Chain")
+		print("ACTIVE HONEYPOT PORTS:")
+
+	result = subprocess.run(['iptables','-vnL','-t','nat'], stdout=subprocess.PIPE)
+	stdout = result.stdout.decode('utf-8')
+	input_list = stdout.split("Chain")
+	#print("######################################")
+	#chains = subprocess.Popen('iptables -vnL -t nat', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+	#input_list = chains[0].split("Chain")
 	hp_ports = []
 
 	for item in input_list:
@@ -50,12 +55,15 @@ def process_honeypots(verbose=0):
 							#get amount of bytes
 							bytes = data[1]
 							if verbose > 0:
-								print "\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[10], rule[3], packets, bytes)
+								print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[10], rule[3], packets, bytes))
 							hp_ports.append(rule[9])
-
+	
 	#check if there are any TARPIT honeypots
-	chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	input_list = chains[0].split("Chain")
+	#chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+	result = subprocess.run(['iptables','-vnL','-t','filter'], stdout=subprocess.PIPE)
+	stdout = result.stdout.decode('utf-8')
+	input_list = stdout.split("Chain")
+	#input_list = chains[0].split("Chain")
 	for item in input_list:
 		parsed = parse_chain(item)
 		if parsed:
@@ -63,16 +71,18 @@ def process_honeypots(verbose=0):
 				for rule in parsed["rules"]:
 					if rule[2].lower() == "tarpit":
 						if verbose > 0:
-							print "\tPORT: {}, TARPIT, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[3], rule[0],rule[1])
+							print("\tPORT: {}, TARPIT, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[3], rule[0],rule[1]))
 						hp_ports.append(rule[9])
 	#check if haas is active
-	chains = subprocess.Popen('iptables -vnL -t nat | grep DNAT', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	rules = parse_DNAT_chain(chains[0])
+	#chains = subprocess.Popen('iptables -vnL -t nat | grep DNAT', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+	result = subprocess.run('iptables -vnL -t nat | grep DNAT', stdout=subprocess.PIPE,shell=True)
+	stdout = result.stdout.decode('utf-8')
+	rules = parse_DNAT_chain(stdout)
 	if rules: #check if there exists at elast one rule
 		for rule in rules:
 			if  "haas" in rule:
 				if verbose > 0:
-					print "\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1])
+					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1]))
 				hp_ports.append(rule[10])
 	return hp_ports						
 
@@ -124,15 +134,16 @@ def parse_chain(chain):
 
 def process_production_ports(verbose=0):
 	if verbose > 0:
-		print "\nACTIVE PRODUCTION PORTS:"
+		print("\nACTIVE PRODUCTION PORTS:")
 	production_ports = []
-	chains = subprocess.Popen('iptables -vnL -t nat | grep DNAT', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	rules = parse_DNAT_chain(chains[0])
+	result = subprocess.run('iptables -vnL -t nat | grep DNAT', stdout=subprocess.PIPE,shell=True)
+	stdout = result.stdout.decode('utf-8')
+	rules = parse_DNAT_chain(stdout)
 	if rules: #check if there exists at elast one rule
 		for rule in rules:
 			if not "haas" in rule:
 				if verbose > 0:
-					print "\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1])
+					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1]))
 				production_ports.append(rule[10])
 	return production_ports
 	
@@ -162,10 +173,12 @@ def parse_DNAT_chain(chain):
 
 def process_accepted_ports(verbose=0):
 	if verbose > 0:
-		print "\nACCEPTED PORTS:"
+		print("\nACCEPTED PORTS:")
 	accepted_ports = []
-	chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	input_list = chains[0].split("Chain")
+	#chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+	result = subprocess.run('iptables -vnL -t filter', stdout=subprocess.PIPE,shell=True)
+	stdout = result.stdout.decode('utf-8')
+	input_list = stdout.split("Chain")
 	for item in input_list:
 		parsed = parse_chain(item)
 		if parsed:
@@ -174,7 +187,7 @@ def process_accepted_ports(verbose=0):
 					#for now, we only consider TCP/IP
 					if rule[2].lower() == "accept" and rule[3].lower() == 'tcp':
 						if verbose > 0:
-							print "\tPORT: {},PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[-1], rule[3], rule[0], rule[1])
+							print("\tPORT: {},PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[-1], rule[3], rule[0], rule[1]))
 						accepted_ports.append(rule[-1])
 	return accepted_ports
 
@@ -200,7 +213,7 @@ if __name__ == '__main__':
 
 	args = parser.parse_args()
 	if args.verbose > 1:
-		print "IPTables Analyzer (version {}) started at {}\n".format(version, datetime.datetime.now())
+		print("IPTables Analyzer (version {}) started at {}\n".format(version, datetime.datetime.now()))
 	output = {}
 	#get data from Honeypots
 	for port in process_honeypots(args.verbose):
@@ -214,4 +227,4 @@ if __name__ == '__main__':
 	with open(args.folder+args.filename+'.json', 'w') as outfile:
 		json.dump(output, outfile)
 	if args.verbose > 1:
-		print "Results stored in '{}'.".format(args.folder+args.filename+'.json')
+		print("Results stored in '{}'.".format(args.folder+args.filename+'.json'))
