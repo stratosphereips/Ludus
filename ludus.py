@@ -34,7 +34,6 @@ import configparser
 from configparser import NoOptionError
 import Volumeter.volumeter as vol
 from multiprocessing import Process
-import locking
 import zmq
 import msgpack
 
