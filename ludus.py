@@ -357,7 +357,7 @@ if __name__ == '__main__':
                 suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             #start Volumeter
-            volumeter_process = vol.Volumeter('147.32.83.175',53333) 
+            volumeter_process = vol.Volumeter(self.router_ip,53333) 
             volumeter_process.start()
 
             print("Volumeter started")
