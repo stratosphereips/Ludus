@@ -22,10 +22,8 @@
 
 import time, threading, datetime
 import sys
-import json
 import subprocess
 import argparse
-
 import Strategizer.strategy_generator as generator
 import IPTablesAnalyzer.iptables_analyzer
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
@@ -36,8 +34,11 @@ import Volumeter.volumeter as vol
 from multiprocessing import Process
 import zmq
 import msgpack
+import time
+import multiprocessing
+import sched
 
-VERSION = 0.6
+VERSION = "0.6"
 
 known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']
 
@@ -119,25 +120,26 @@ def get_ports_information():
 
 class Ludus(object):
     """Main program for LUDUS project"""
-    def __init__(self, volumeter_port,config_file='/etc/ludus/ludus.config'):
-        
+    def __init__(self, volumeter_port,flag, config_file='/etc/ludus/ludus.config'):
         self.volumeter_client = Volumeter_client(volumeter_port)
         self.config_parser = parser = configparser.ConfigParser()
         self.config_file = config_file
-        self.flag = threading.Event()
-        self.suricat_extractor = s_extractor.Extractor("/root/var/log/suricata/eve.json")
+        self.flag = flag
+        self.suricat_extractor = s_extractor.Extractor("/var/log/suricata/eve.json")
         self.tw_start = None
         self.read_configuration()
         self.next_call = 0
+        self.s = Sendline() #na zacatku zavolas tohle
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
         self.config_parser.read(self.config_file)
         self.strategy_file = self.config_parser.get('strategy', 'filename')
 
-        self.json_file = self.config_parser.get('output', 'filename')
+        #self.json_file = self.config_parser.get('output', 'filename')
         try:
             self.tw_length = self.config_parser.getint('settings', 'timeout')
+            print("TW LEN", self.tw_length)
         except NoOptionError:
             print("Option 'timeout' not found! Using DEFAULT value 60 insted.")
             self.tw_length = 60
@@ -176,8 +178,8 @@ class Ludus(object):
 
     def generate_output(self,suricata_data, volumeter_data):
         output = {}
-        output["tw_start"] = self.tw_start.isoformat(' ')
-        output["tw_end"] = self.tw_end.isoformat(' ')
+        output["tw_start"] = datetime.datetime.fromtimestamp(self.tw_start).isoformat(' ')
+        output["tw_end"] = datetime.datetime.fromtimestamp(self.tw_end).isoformat(' ')
         #STORE PORT INFORMATION
         portInfo = {}
         #TCP
@@ -220,6 +222,46 @@ class Ludus(object):
         return output
 
     def run(self):
+        print(f"-------start: {datetime.datetime.fromtimestamp(self.tw_start)}-------")
+        self.tw_end = time.time()
+        next_start = self.tw_end
+        #get data from Volumeter
+        volumeter_data = self.volumeter_client.get_data_and_reset()
+        self.next_call += self.tw_length #this helps to avoid drifting in time windows
+        next_start = self.tw_end
+        #get data from Suricata-Extractor
+        suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)    
+        old_strategy = self.strategy_file
+        #check if there is any change configuration
+        self.read_configuration()
+
+        #get the information about ports in use
+        (production_ports, active_hp) = get_ports_information()  
+        #do we need to change the defence_strategy?
+        if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
+            #update the settings
+            self.active_honeypots = active_hp
+            self.production_ports = production_ports
+            #get strategy
+            suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
+            self.apply_strategy(suggested_honeypots)
+        
+        #store the information in the file
+        output = self.generate_output(suricata_data, volumeter_data)
+
+        #-------------------------
+        #REMOVE BEFORE PUBLISHING
+        print(output)
+        #-------------------------
+
+        self.s.sendline(output) #potom takhle odesilas data
+
+        self.tw_start = self.tw_end
+        print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
+        self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
+
+    
+    def start(self):
         """Main loop"""
         
         #analyze the production ports
@@ -229,105 +271,63 @@ class Ludus(object):
         print("{} is suggested strategy for port combination {}".format(self.production_ports, suggested_honeypots))
         #apply strategy
         self.apply_strategy(suggested_honeypots)
-        self.tw_start = datetime.datetime.now()
-        self.next_call = time.time()
-        try:
-            while not self.flag.wait(timeout=(self.next_call +self.tw_length) - time.time()):
-
-                print("-------start: {}-------".format(datetime.datetime.now()))
-                self.next_call+= self.tw_length #this helps to avoid drifting in time windows
-                self.tw_end = datetime.datetime.now()
-            
-                #get data from Volumeter
-                volumeter_data = self.volumeter_client.get_data_and_reset()
-               
-                #get data from Suricata-Extractor
-                suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
-                
-                old_strategy = self.strategy_file
-                #check if there is any change configuration
-                self.read_configuration()
-
-                #get the information about ports in use
-                (production_ports, active_hp) = get_ports_information()
-                
-                #do we need to change the defence_strategy?
-                if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
-                    #update the settings
-                    self.active_honeypots = active_hp
-                    self.production_ports = production_ports
-                    #get strategy
-                    suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
-                    self.apply_strategy(suggested_honeypots)
-                
-                #store the information in the file
-                output = self.generate_output(suricata_data, volumeter_data)
-
-                #-------------------------
-                #REMOVE BEFORE PUBLISHING
-                print(output)
-                #-------------------------
-              
-                #write values in the file
-                """with open(self.json_file, 'a+') as fp:
-                    s = json.dumps(output)
-                    fp.write(s+'\n')
-                """
-                #locking.save_data(json.dumps(output), self.json_file)
-                #move TW
-
-                #send 
-
-
-                testdata ={
-                    "timestamp": "2011/12/22 13:14:15.654321+0230",
-                    "GameStrategyFileName": "strategy",
-                    'honeypots': [22],
-                    'production_ports': [5900, 902, 903],
-                    "alerts":{
-                        "Alerts/DstBClassNet": {"123.456.789.101": 31, "8.8.8.8":15},
-                        "Alerts/SrcBClassNet": {"1.1.1.1":3},
-                        "# Severity 1": 9999,
-                        "# Severity 2": 7123,
-                        "# Severity 3": 8712,
-                        "# Severity 4": 651468,
-                        "# Uniq Signatures": 6584994,
-                        "Alerts Categories":{
-                                "Attempted Administrator Privilege Gain":11,
-                                "Executable Code was Detected": 7,
-                                "A TCP Connection was Detected": 9,
-                                "Potential Corporate Privacy Violation": 6,
-                                "Attempt to Login By a Default Username and Password": 3
-                        }
-                    },
-                    "PortInfo":{
-                        "TCP":{
-                            "22": {"type": "Honeypot", "bytes": 31, "Packets": 392, "Flows": 7896, "#Alerts": 78945},
-                            "80": {"type": "Production", "bytes": 33, "Packets": 777, "Flows": 1889, "#Alerts": 56432}
-                        },
-                        "UDP":{
-                            "32": {"type": "Honeypot", "bytes": 1203, "Packets": 64312, "Flows": 16854, "#Alerts": 87964},
-                            "80": {"type": "Production", "bytes": 999, "Packets": 83613, "Flows": 7861, "#Alerts": 45623}
-                        }
-                    }
-                }
-
-
-
-
-                s=Sendline() #na zacatku zavolas tohle
-
-                s.sendline(testdata) #potom takhle odesilas data
-
-                s.close() #na konci zavolas tohle.
-                self.tw_start = self.tw_end
-                print("TW------end: {}--------".format(datetime.datetime.now()))            
         
-        #Asynchronous interruption
-        except KeyboardInterrupt:
-            #terminate Volumeter
-            self.volumeter_client.terminate()
-            print("\nLeaving Ludus")
+        self.tw_start = time.time()
+        
+
+
+        self.scheduler = sched.scheduler()
+        self.next_call = self.tw_start
+        self.scheduler.enter(self.tw_length, 1, self.run)
+        self.scheduler.run()
+        """
+
+
+        self.next_call = time.time()
+        while not self.flag.wait(timeout=(self.next_call +self.tw_length) - time.time()):
+            print(f"-------start: {self.tw_start}-------")
+            self.next_call+= self.tw_length #this helps to avoid drifting in time windows
+            self.tw_end = datetime.datetime.now()
+        
+            #get data from Volumeter
+            volumeter_data = {}
+            volumeter_data = self.volumeter_client.get_data_and_reset()
+            #print("VOLUMETER DATA:", volumeter_data)
+            #get data from Suricata-Extractor
+            suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
+            
+            old_strategy = self.strategy_file
+            #check if there is any change configuration
+            self.read_configuration()
+
+            #get the information about ports in use
+            (production_ports, active_hp) = get_ports_information()
+            
+            #do we need to change the defence_strategy?
+            if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
+                #update the settings
+                self.active_honeypots = active_hp
+                self.production_ports = production_ports
+                #get strategy
+                suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
+                self.apply_strategy(suggested_honeypots)
+            
+            #store the information in the file
+            output = self.generate_output(suricata_data, volumeter_data)
+
+            #-------------------------
+            #REMOVE BEFORE PUBLISHING
+            print(output)
+            #-------------------------
+
+            self.s.sendline(output) #potom takhle odesilas data
+
+            self.tw_start = self.tw_end
+            print(f"TW------end: {datetime.datetime.now()}--------")            
+        """
+        
+        #terminate the connection to DB
+        self.s.close() #na konci zavolas tohle.
 
 if __name__ == '__main__':
 
@@ -338,27 +338,35 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     #start the tool
-    print(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'")
+    print(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n")
     print(f"\nVersion {VERSION}\n")
-    print("Started on {}\n".format(datetime.datetime.now()))
+
 
 
     #check if suricata is running
     process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = process.communicate()
-    ludus = Ludus(args.volumeter_port, args.config)
+    end_flag = threading.Event()
+    ludus = Ludus(args.volumeter_port,end_flag,args.config)
     if(len(err) > 0): #something wrong with the suricata running test
         print("Error while testing if suricata is running.")
     else:
-        if(len(out) == 0): #no running suricata
-            prnt("Suricata is required for running Ludus. Please start suricata and restart ludus.py")
-        else: #its ok, proceed
+        try:
+            if(len(out) == 0): #no running suricata
+                print("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.")
+                suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
             #start Volumeter
-            v = vol.Volumeter(ludus.router_ip, args.volumeter_port)
-            p = Process(target=v.main, args=(),name='Volumeter')
-            p.start()
-            if p.pid is not None:
-                print("Volumeter started")
-                #everything is set, start ludus
-                ludus.run()
-                p.join()
+            volumeter_process = vol.Volumeter('147.32.83.175',53333) 
+            volumeter_process.start()
+
+            print("Volumeter started")
+            #everything is set, start ludus
+            print("Started on {}\n".format(datetime.datetime.now()))
+            ludus.start()
+
+        except KeyboardInterrupt:
+            end_flag.set()
+            ludus.s.close()
+            volumeter_process.join()
+            print("\nLeaving Ludus")
