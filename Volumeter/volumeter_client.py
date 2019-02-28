@@ -23,7 +23,6 @@
 
 import argparse
 import socket
-import json
 import pickle
 
 class Volumeter_client(object):
@@ -42,11 +41,12 @@ class Volumeter_client(object):
 		"""Sends signal to get data"""
 		self.socket = socket.socket()
 		self.socket.connect((self.host,self.port))
-		self.socket.sendall('GET_DATA'.encode())
+		self.socket.sendall("GET_DATA".encode())
 		data = self.socket.recv(1024)
-		print(data)
+		#print len(data)
 		self.socket.close()
-		return json.loads(data)
+		#print("DATA:",pickle.loads(data))
+		return pickle.loads(data)
 
 	def reset_counter(self):
 		"""Send signal to reset the counters"""
@@ -65,6 +65,7 @@ class Volumeter_client(object):
 		data = self.socket.recv(1024)
 		#print len(data)
 		self.socket.close()
+		print("DATA:",pickle.loads(data))
 		return pickle.loads(data)
 	
 	def terminate(self):
@@ -84,14 +85,11 @@ if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser()
 	parser.add_argument('-c', '--command', help='Command to be send to the volumeter', action='store', required=True, type=str)
-	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53336)
+	parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
 	args = parser.parse_args()
 	
 
 	s = socket.socket()	# Create a socket object
 	host = 'localhost'	# Get local machine name
-	
-	s.connect((host, args.port))
-	s.sendall(args.command)
-	print(s.recv(1024))
-	s.close()
+	client = Volumeter_client(args.port)
+	client.get_data()

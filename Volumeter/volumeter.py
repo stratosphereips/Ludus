@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #  Copyright (C) 2017  Sebastian Garcia, Ondrej Lukas
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -23,7 +23,7 @@
 import subprocess
 import re
 import datetime
-import json
+
 import argparse
 import sys
 import socket
@@ -31,16 +31,6 @@ import os
 import multiprocessing
 from multiprocessing import Queue
 import pickle
-
-def default(o):
-    return o._asdict()
-
-class MyEncoder(json.JSONEncoder):
-    """Simple JSON encoder for storing Port objects"""
-    def default(self, obj):
-        if not isinstance(obj, Port):
-            return super(MyEncoder, self).default(obj)
-        return obj.__dict__
 
 class Port(object):
     """Container for volumes counting. For unfinished conections, buffers (1 pkts/event) are used as an estimation. THIS ESTIMATE IS ONLY USED IF ASKED FOR THE VOLUME BEFORE THE CONNNECTION ENDS. Upon
@@ -58,11 +48,12 @@ class Port(object):
         self.bytes += new_bytes
         #print "[{}] New connection destroyed in port {} \tPKTS: {}, BYTES: {}".format(timestamp, self.id, self.packets,self.bytes)
         #erase buffer
+        #print("UPDATED", self)
         self.tcp_buffer = 0
 
 
-    def values_for_json(self):
-        return {'bytes': self.bytes, 'packets':(self.packets + self.buffer)}
+    def get_values(self):
+        return {"bytes": self.bytes, "packets":(self.packets + self.buffer)}
 
     def increase_buffer(self, timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
@@ -70,7 +61,7 @@ class Port(object):
         self.buffer +=1
 
     def __str__(self):
-        return "<ID: {}, bytes: {}, packets: {}, buffer: {}>".format(self.id, self.bytes, self.packets, self.buffer)
+        return f"<ID: {self.id}, bytes: {self.bytes}, packets: {self.packets}, buffer: {self.buffer}>"
 
 class Counter(multiprocessing.Process):
     """Counts pkts/bytes in each port"""
@@ -78,14 +69,14 @@ class Counter(multiprocessing.Process):
         multiprocessing.Process.__init__(self)
         self.queue = queue
         self.tcp = {}
-        self.icmp = Port('icmp')
+        self.icmp = Port("icmp")
         self.udp = {}
 
         self.router_ip = router_ip
         self.end_flag = end_flag
         self.socket =socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setblocking(0)
-        self.socket.bind(('localhost', port))
+        self.socket.bind(("localhost", port))
         self.socket.listen(5)
 
     def process_event(self,string):
@@ -110,15 +101,15 @@ class Counter(multiprocessing.Process):
                 dst_ip = parts[4].strip("dst=")
                 sport = int(parts[5].strip("sport="))
                 dport = int(parts[6].strip("dport="))
-                #[UNREPLIED] event
-                if parts[9].strip("[]").lower() == "unreplied":
-                    pkts = int(parts[7].strip("packets="))
-                    data_bytes = int(parts[8].strip("bytes="))
-                else:
-                    pkts = int(parts[7].strip("packets=")) +  int(parts[13].strip("packets="))
-                    data_bytes = int(parts[8].strip("bytes=")) + int(parts[14].strip("bytes="))
                 #store the vlaues in the dict
                 if dst_ip == self.router_ip:
+                    #[UNREPLIED] event
+                    if parts[9].strip("[]").lower() == "unreplied":
+                        pkts = int(parts[7].strip("packets="))
+                        data_bytes = int(parts[8].strip("bytes="))
+                    else:
+                        pkts = int(parts[7].strip("packets=")) +  int(parts[13].strip("packets="))
+                        data_bytes = int(parts[8].strip("bytes=")) + int(parts[14].strip("bytes="))
                     if protocol == "tcp":
                         try:
                             self.tcp[dport].add_values(pkts, data_bytes,timestamp)
@@ -135,10 +126,12 @@ class Counter(multiprocessing.Process):
                             self.udp[dport].add_values(pkts, data_bytes,timestamp)
             else: #Active connection - at least estimate the number of pkts
                 if protocol == 'tcp':
+                    #print(parts)
                     dst_ip = parts[6].strip("dst=")
-                    dport = parts[8].strip("dport=")
+                    dport = int(parts[8].strip("dport="))
                     #store values
                     if dst_ip == self.router_ip:
+                        #print(parts)
                         try:
                             self.tcp[dport].increase_buffer(timestamp)
                         except KeyError:
@@ -147,9 +140,10 @@ class Counter(multiprocessing.Process):
                             self.tcp[dport].increase_buffer(timestamp)
                 else:
                     dst_ip = parts[5].strip("dst=")
-                    dport = parts[8].strip("dport=")
+                    dport = int(parts[7].strip("dport="))
                     #store values
                     if dst_ip == self.router_ip:
+                        #print(parts)
                         try:
                             self.udp[dport].increase_buffer(timestamp)
                         except KeyError:
@@ -157,6 +151,7 @@ class Counter(multiprocessing.Process):
                             self.udp[dport] = Port(dport)
                             self.udp[dport].increase_buffer(timestamp)
         #ICMP
+        
         elif protocol == "icmp":
             dst_ip = parts[4].strip("dst=")
             if dst_ip == self.router_ip:           
@@ -167,32 +162,35 @@ class Counter(multiprocessing.Process):
         else:
             #we are not interested in anyhting else for now, just continue
             pass
-    def create_JSON(self):
+
+    def build_dict(self):
         d = {}
-        d['icmp'] = self.icmp.values_for_json()
+        #d['icmp'] = self.icmp.get_values()
         tmp = {}
         for port in self.tcp.keys():
-            tmp[port] = self.tcp[port].values_for_json()
+            tmp[port] = self.tcp[port].get_values()
         d['tcp'] = tmp
         tmp = {}
         for port in self.udp.keys():
-            tmp[port] = self.udp[port].values_for_json()
+            tmp[port] = self.udp[port].get_values()
         d['udp'] = tmp
         return d
+
     def reset_counters(self):
         self.udp = {}
         self.tcp = {}
         self.icmp = Port('icmp')
 
     def process_msg(self, msg):
+        #print(msg)
         """Processes the message recieved from the control program and if it contains known commnad, generates the respons"""
         if msg.lower() == 'get_data':
-            values = {'icmp':self.icmp, 'tmp':self.tcp, 'udp':self.udp}
-            data = json.dumps(values, default=lambda x: x.__dict__)
-            return data
+            response = pickle.dumps(self.build_dict())
+            #reset counters
+            return response
         elif msg.lower() == 'get_data_and_reset':
             #get data first
-            response = pickle.dumps(self.create_JSON())
+            response = pickle.dumps(self.build_dict())
             #reset counters
             self.reset_counters()
             return response
@@ -203,8 +201,6 @@ class Counter(multiprocessing.Process):
             self.tcp = {}
             #confirm
             return "reset_done"
-        elif msg.lower() == "terminate":
-            return "terminating"
         else: #we dont recognize the command
             return "unknown_command"
 
@@ -217,11 +213,14 @@ class Counter(multiprocessing.Process):
                     msg = c.recv(1024).decode()
                     if msg:
                         response = self.process_msg(msg)
-                        print("MSG: '{}'".format(msg))
-                        c.send(response)
-                        c.close()
+                        #print("MSG: '{}'".format(msg))
                         if(response.lower() == "terminating"):
                             self.end_flag.set()
+                            c.send(response.encode())
+                            c.close()
+                        else:
+                            c.send(response)
+                            c.close()
                 except socket.error:
                     #no, just wait
                     pass
@@ -237,14 +236,15 @@ class Counter(multiprocessing.Process):
         finally:
             self.socket.close()
 
-class Volumeter(object):
+class Volumeter(multiprocessing.Process):
 
 
     def __init__(self,address, port):
+        multiprocessing.Process.__init__(self)
         self.address = address
         self.port = port
    
-    def main(self):
+    def run(self):
         #create flag to exit gracefully
         exit_flag = multiprocessing.Event()
         #create queue for comunication between processes
@@ -257,26 +257,22 @@ class Volumeter(object):
 
         #yet another process
         process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        #result = subprocess.run('conntrack -E -o timestamp', stdout=subprocess.PIPE)
 
         #***MAIN LOOP***
-        while not exit_flag.is_set():
-            try:
-                for line in process.stdout:
+        try:
+            while True:
+                for line in process.stdout: 
                     queue.put(line.decode('utf-8'))
-            except KeyboardInterrupt:
-                print("\nInterrupting volumeter")
-                exit_flag.set()
-                process.terminate()
-                counter.join()
+        except KeyboardInterrupt:
+            print("\nInterrupting volumeter")
+            process.terminate()
+            counter.join()
 
 if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.179')
+    parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.175')
     parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
-    process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    while True:
-        for line in process.stdout:
-            print(line.decode('utf-8'))
+    v = Volumeter(args.address, args.port)
+    v.run()
