@@ -27,8 +27,8 @@ categories = {"Not Suspicious Traffic":[], "Unknown Traffic":[], "Potentially Ba
 class TimeWindow(object):
     """ Store info about the time window """
     def __init__(self, tw_start,tw_end):
-        self.start = tw_start
-        self.end = tw_end
+        self.start = datetime.fromtimestamp(tw_start)
+        self.end = datetime.fromtimestamp(tw_end)
 
         self.categories = {}
         self.severities = {}
