@@ -37,7 +37,8 @@ import msgpack
 import time
 import multiprocessing
 import sched
-
+import os
+import signal
 VERSION = "0.6"
 
 known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']
@@ -125,7 +126,9 @@ class Ludus(object):
         self.config_parser = parser = configparser.ConfigParser()
         self.config_file = config_file
         self.flag = flag
-        self.suricat_extractor = s_extractor.Extractor("/var/log/suricata/eve.json")
+        self.suricata_log = "/var/log/suricata/eve.json"
+        self.suricata_tmp_log = "/var/log/suricata/suricata_log.json"
+        self.suricat_extractor = s_extractor.Extractor(self.suricata_tmp_log)
         self.tw_start = None
         self.read_configuration()
         self.next_call = 0
@@ -227,10 +230,13 @@ class Ludus(object):
         next_start = self.tw_end
         #get data from Volumeter
         volumeter_data = self.volumeter_client.get_data_and_reset()
+        os.rename(self.suricata_log, self.suricata_tmp_log)
+        os.kill(self.suricata_pid, signal.SIGHUP)
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
         #get data from Suricata-Extractor
-        suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)    
+        suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
+        os.remove(self.suricata_tmp_log)
         old_strategy = self.strategy_file
         #check if there is any change configuration
         self.read_configuration()
@@ -355,7 +361,8 @@ if __name__ == '__main__':
             if(len(out) == 0): #no running suricata
                 print("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.")
                 suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
+            ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
+            print("PID",ludus.suricata_pid)
             #start Volumeter
             volumeter_process = vol.Volumeter(ludus.router_ip,53333) 
             volumeter_process.start()

@@ -274,7 +274,7 @@ class Extractor(object):
         self.timewindow = None
         self.line_number = 0
         self.last_timestamp = None
-        self.file = "/var/log/suricata/eve.json"
+        self.file = filename
 
     def process_line(self, line, timewindow):
         """
@@ -355,6 +355,6 @@ class Extractor(object):
             for line in islice(lines, self.line_number, None): #skip the lines we already inspected
                 self.process_line(line,self.timewindow)
                 counter+=1
-        self.line_number += counter
+        #self.line_number += counter
         print("Number of processed lines:{}".format(counter))
         return self.timewindow.get_data_as_dict()
