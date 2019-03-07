@@ -18,7 +18,7 @@
 # This file is part of the Stratosphere Linux IPS project. https://stratosphereips.org
 
 # Author:
-# Ondrej Lukas, ondrej.lukas95@gmail.com    
+# Ondrej Lukas - ondrej.lukas95@gmail.com , lukasond@fel.cvut.cz 
 
 import time, threading, datetime
 import sys
@@ -56,10 +56,6 @@ class Sendline():
         self.zmqsocket.send_multipart([self.TOPIC, packed])
     def close(self):
         self.zmqcontext.destroy()
-
-
-
-
 
 
 def open_honeypot(port, known_honeypots, protocol='tcp'):
@@ -281,60 +277,11 @@ class Ludus(object):
         print("{} is suggested strategy for port combination {}".format(self.production_ports, suggested_honeypots))
         #apply strategy
         self.apply_strategy(suggested_honeypots)
-        
         self.tw_start = time.time()
-        
-
-
         self.scheduler = sched.scheduler()
         self.next_call = self.tw_start
         self.scheduler.enter(self.tw_length, 1, self.run)
         self.scheduler.run()
-        """
-
-
-        self.next_call = time.time()
-        while not self.flag.wait(timeout=(self.next_call +self.tw_length) - time.time()):
-            print(f"-------start: {self.tw_start}-------")
-            self.next_call+= self.tw_length #this helps to avoid drifting in time windows
-            self.tw_end = datetime.datetime.now()
-        
-            #get data from Volumeter
-            volumeter_data = {}
-            volumeter_data = self.volumeter_client.get_data_and_reset()
-            #print("VOLUMETER DATA:", volumeter_data)
-            #get data from Suricata-Extractor
-            suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
-            
-            old_strategy = self.strategy_file
-            #check if there is any change configuration
-            self.read_configuration()
-
-            #get the information about ports in use
-            (production_ports, active_hp) = get_ports_information()
-            
-            #do we need to change the defence_strategy?
-            if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
-                #update the settings
-                self.active_honeypots = active_hp
-                self.production_ports = production_ports
-                #get strategy
-                suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
-                self.apply_strategy(suggested_honeypots)
-            
-            #store the information in the file
-            output = self.generate_output(suricata_data, volumeter_data)
-
-            #-------------------------
-            #REMOVE BEFORE PUBLISHING
-            print(output)
-            #-------------------------
-
-            self.s.sendline(output) #potom takhle odesilas data
-
-            self.tw_start = self.tw_end
-            print(f"TW------end: {datetime.datetime.now()}--------")            
-        """
         
         #terminate the connection to DB
         self.s.close() #na konci zavolas tohle.

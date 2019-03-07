@@ -228,14 +228,8 @@ class Counter(multiprocessing.Process):
                     #no, just wait
                     pass
                 #read from the queue
-                if not self.queue.empty():
-                    line = self.queue.get_nowait().decode("utf-8")
-                    if len(line) > 0:
-                        #print(line)
-                        self.process_event(line)
-                else:
-                    pass
-                    time.sleep(.1)
+                line = self.queue.get().decode("utf-8")
+                self.process_event(line)
             self.socket.close()
         except KeyboardInterrupt:
             self.socket.close()

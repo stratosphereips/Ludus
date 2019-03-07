@@ -177,9 +177,8 @@ class TimeWindow(object):
                 #print 'New dst IP {}, attacked from srcip {} on port {}'.format(dst_ip, src_ip, destport)
     """
     def get_json(self):
-        """
-        Returns the json representation of the data in this time window
-        """
+        
+        #Returns the json representation of the data in this time window
         data = {}
         data["Alerts Categories"] = self.categories
         data["# Uniq Signatures"] = len(self.signatures)
