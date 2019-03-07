@@ -23,7 +23,7 @@
 import subprocess
 import re
 import datetime
-
+import select
 import argparse
 import sys
 import socket
@@ -31,6 +31,10 @@ import os
 import multiprocessing
 from multiprocessing import Queue
 import pickle
+import time
+from threading  import Thread
+
+
 
 class Port(object):
     """Container for volumes counting. For unfinished conections, buffers (1 pkts/event) are used as an estimation. THIS ESTIMATE IS ONLY USED IF ASKED FOR THE VOLUME BEFORE THE CONNNECTION ENDS. Upon
@@ -46,18 +50,17 @@ class Port(object):
         #update values
         self.packets += new_packets
         self.bytes += new_bytes
-        #print "[{}] New connection destroyed in port {} \tPKTS: {}, BYTES: {}".format(timestamp, self.id, self.packets,self.bytes)
+        #print("[{}] New connection destroyed in port {} \tPKTS: {}, BYTES: {}".format(timestamp, self.id, self.packets,self.bytes))
         #erase buffer
         #print("UPDATED", self)
         self.tcp_buffer = 0
-
 
     def get_values(self):
         return {"bytes": self.bytes, "packets":(self.packets + self.buffer)}
 
     def increase_buffer(self, timestamp):
         """Connection  is still active, estimate it with 1 pkt in buffer"""
-        #print "[{}] Active connection in port {} - buffer incremented".format(timestamp, self.id)
+        #print("[{}] Active connection in port {} - buffer incremented".format(timestamp, self.id))
         self.buffer +=1
 
     def __str__(self):
@@ -72,12 +75,13 @@ class Counter(multiprocessing.Process):
         self.icmp = Port("icmp")
         self.udp = {}
 
-        self.router_ip = router_ip
+        self.router_ip = router_ip.rstrip('\n')
         self.end_flag = end_flag
         self.socket =socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setblocking(0)
         self.socket.bind(("localhost", port))
         self.socket.listen(5)
+        print("Router IP:",self.router_ip)
 
     def process_event(self,string):
         """Parses the events from conntrack and stores the volumes (pkts, bytes). Port class is used as a container"""
@@ -91,14 +95,14 @@ class Counter(multiprocessing.Process):
                 parts.append(part.strip())
         #get the basic information about the connection
         event = parts[0].strip("[]")
-        protocol = parts[1]
+        protocol = parts[1].lower()
 
         #is it a protocol with ports?
         if protocol == "udp" or protocol == "tcp":
             #has the connection finished yet?
             if event.lower() == 'destroy':
-                src_ip = parts[3].strip("src=")
-                dst_ip = parts[4].strip("dst=")
+                src_ip = parts[3].strip("src=").rstrip('\n')
+                dst_ip = parts[4].strip("dst=").rstrip('\n')
                 sport = int(parts[5].strip("sport="))
                 dport = int(parts[6].strip("dport="))
                 #store the vlaues in the dict
@@ -127,11 +131,10 @@ class Counter(multiprocessing.Process):
             else: #Active connection - at least estimate the number of pkts
                 if protocol == 'tcp':
                     #print(parts)
-                    dst_ip = parts[6].strip("dst=")
+                    dst_ip = parts[6].strip("dst=").strip()
                     dport = int(parts[8].strip("dport="))
                     #store values
                     if dst_ip == self.router_ip:
-                        #print(parts)
                         try:
                             self.tcp[dport].increase_buffer(timestamp)
                         except KeyError:
@@ -139,7 +142,7 @@ class Counter(multiprocessing.Process):
                             self.tcp[dport] = Port(dport)
                             self.tcp[dport].increase_buffer(timestamp)
                 else:
-                    dst_ip = parts[5].strip("dst=")
+                    dst_ip = parts[5].strip("dst=").strip()
                     dport = int(parts[7].strip("dport="))
                     #store values
                     if dst_ip == self.router_ip:
@@ -226,9 +229,13 @@ class Counter(multiprocessing.Process):
                     pass
                 #read from the queue
                 if not self.queue.empty():
-                    line = self.queue.get()
+                    line = self.queue.get_nowait().decode("utf-8")
                     if len(line) > 0:
+                        #print(line)
                         self.process_event(line)
+                else:
+                    pass
+                    time.sleep(.1)
             self.socket.close()
         except KeyboardInterrupt:
             self.socket.close()
@@ -254,15 +261,11 @@ class Volumeter(multiprocessing.Process):
         #start it
         print("Staring counter:{}".format(datetime.datetime.now()))
         counter.start()
-
-        #yet another process
-        process = subprocess.Popen('conntrack -E -o timestamp', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        #***MAIN LOOP***
         try:
-            while True:
-                for line in process.stdout: 
-                    queue.put(line.decode('utf-8'))
+            process=subprocess.Popen(['conntrack','-E','-o','timestamp'],stdout=subprocess.PIPE)
+            for line in iter(process.stdout.readline, b''):
+                 queue.put(line)
+            process.stdout.close()
         except KeyboardInterrupt:
             print("\nInterrupting volumeter")
             process.terminate()
@@ -274,5 +277,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.175')
     parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
+    #create the process
     v = Volumeter(args.address, args.port)
+    #start it
     v.run()
