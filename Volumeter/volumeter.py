@@ -16,7 +16,7 @@
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 # Author:
-# Ondrej Lukas, ondrej.lukas95@gmail.com    
+# Ondrej Lukas - ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz   
 
 # Description
 # A program that analyzes output of conntrack and counts pkts and bytes transfered in each port in each protocol
@@ -245,7 +245,6 @@ class Counter(multiprocessing.Process):
 
 class Volumeter(multiprocessing.Process):
 
-
     def __init__(self,address, port):
         multiprocessing.Process.__init__(self)
         self.address = address
@@ -274,7 +273,7 @@ class Volumeter(multiprocessing.Process):
 if __name__ == '__main__':
     #get parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--address', help='public address of the router', action='store', required=False, type=str, default='147.32.83.175')
+    parser.add_argument('-a', '--address', help='public address of the router', action='store', required=True, type=str)
     parser.add_argument('-p', '--port', help='Port used for communication with Ludus.py', action='store', required=False, type=int, default=53333)
     args = parser.parse_args()
     #create the process

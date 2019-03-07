@@ -26,9 +26,6 @@ def process_honeypots(verbose=0):
 	result = subprocess.run(['iptables','-vnL','-t','nat'], stdout=subprocess.PIPE)
 	stdout = result.stdout.decode('utf-8')
 	input_list = stdout.split("Chain")
-	#print("######################################")
-	#chains = subprocess.Popen('iptables -vnL -t nat', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	#input_list = chains[0].split("Chain")
 	hp_ports = []
 
 	for item in input_list:
@@ -36,7 +33,6 @@ def process_honeypots(verbose=0):
 		if parsed:
 			for rule in parsed["rules"]:
 				if len(rule) > 10:
-					#print "Rule: " + parsed["name"]
 					#is the port open?
 					if len(subprocess.Popen('netstat -anp | grep '+ rule[10], shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0]):
 						data = (rule[0], rule[1])
@@ -175,7 +171,6 @@ def process_accepted_ports(verbose=0):
 	if verbose > 0:
 		print("\nACCEPTED PORTS:")
 	accepted_ports = []
-	#chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 	result = subprocess.run('iptables -vnL -t filter', stdout=subprocess.PIPE,shell=True)
 	stdout = result.stdout.decode('utf-8')
 	input_list = stdout.split("Chain")

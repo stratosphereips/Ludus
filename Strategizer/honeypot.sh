@@ -1,6 +1,7 @@
 #!/bin/bash
 #SSH HP: uci del_list updater.pkglists.lists='i_agree_honeypot'
 #MINIPOTS: uci del_list ucollect.fakes.disable='80tcp'
+#Author Ondrej Lukas - lukasond@fel.cvut.cz 
 
 ACTION=
 PORT=

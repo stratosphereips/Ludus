@@ -229,14 +229,18 @@ class Ludus(object):
         self.tw_end = time.time()
         next_start = self.tw_end
         #get data from Volumeter
+        #volumeter_data = {"tcp":{}, "udp":{}}
         volumeter_data = self.volumeter_client.get_data_and_reset()
-        os.rename(self.suricata_log, self.suricata_tmp_log)
-        os.kill(self.suricata_pid, signal.SIGHUP)
+        try:
+            os.rename(self.suricata_log, self.suricata_tmp_log)
+            os.kill(self.suricata_pid, signal.SIGHUP)
+            #get data from Suricata-Extractor
+            suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
+            os.remove(self.suricata_tmp_log)
+        except FileNotFoundError:
+            suricata_data = {}
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
-        #get data from Suricata-Extractor
-        suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
-        os.remove(self.suricata_tmp_log)
         old_strategy = self.strategy_file
         #check if there is any change configuration
         self.read_configuration()
@@ -364,6 +368,7 @@ if __name__ == '__main__':
             ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
             print("PID",ludus.suricata_pid)
             #start Volumeter
+            print(list(ludus.router_ip))
             volumeter_process = vol.Volumeter(ludus.router_ip,53333) 
             volumeter_process.start()
 

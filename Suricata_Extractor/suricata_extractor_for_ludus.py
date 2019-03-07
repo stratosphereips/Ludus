@@ -1,7 +1,7 @@
 #!/usr/bin/python -u
 # See the file 'LICENSE' for copying permission.
 # Authors:  Sebastian Garcia. eldraco@gmail.com , sebastian.garcia@agents.fel.cvut.cz
-#           Ondrej Lukas. ondrej.lukas95@gmail.com
+#           Ondrej Lukas. ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
 
 import sys
 from datetime import datetime
@@ -20,7 +20,41 @@ version = '0.3.2'
 
 timewindows = {}
 timeStampFormat = '%Y-%m-%dT%H:%M:%S.%f'
-categories = {"Not Suspicious Traffic":[], "Unknown Traffic":[], "Potentially Bad Traffic":[], "Attempted Information Leak":[], "Information Leak":[], "Large Scale Information Leak":[], "Attempted Denial of Service":[], "Denial of Service":[], "Attempted User Privilege Gain":[], "Unsuccessful User Privilege Gain":[], "Successful User Privilege Gain":[], "Attempted Administrator Privilege Gain":[], "Successful Administrator Privilege Gain":[], "Decode of an RPC Query":[], "Executable Code was Detected":[], "A Suspicious String was Detected":[], "A Suspicious Filename was Detected":[], "An Attempted Login Using a Suspicious Username was Detected":[], "A System Call was Detected":[], "A TCP Connection was Detected":[], "A Network Trojan was Detected":[], "A Client was Using an Unusual Port":[], "Detection of a Network Scan":[], "Detection of a Denial of Service Attack":[], "Detection of a Non-Standard Protocol or Event":[], "Generic Protocol Command Decode":[], "Access to a Potentially Vulnerable Web Application":[], "Web Application Attack":[], "Misc activity":[], "Misc Attack":[], "Generic ICMP event":[], "Inappropriate Content was Detected":[], "Potential Corporate Privacy Violation":[], "Attempt to Login By a Default Username and Password":[]}
+categories = {
+    "Not Suspicious Traffic":[],
+    "Unknown Traffic":[],
+    "Potentially Bad Traffic":[],
+    "Attempted Information Leak":[],
+    "Information Leak":[],
+    "Large Scale Information Leak":[],
+    "Attempted Denial of Service":[],
+    "Denial of Service":[],
+    "Attempted User Privilege Gain":[],
+    "Unsuccessful User Privilege Gain":[],
+    "Successful User Privilege Gain":[],
+    "Attempted Administrator Privilege Gain":[],
+    "Successful Administrator Privilege Gain":[],
+    "Decode of an RPC Query":[],
+    "Executable Code was Detected":[],
+    "A Suspicious String was Detected":[],
+    "A Suspicious Filename was Detected":[],
+    "An Attempted Login Using a Suspicious Username was Detected":[],
+    "A System Call was Detected":[],
+    "A TCP Connection was Detected":[],
+    "A Network Trojan was Detected":[],
+    "A Client was Using an Unusual Port":[],
+    "Detection of a Network Scan":[],
+    "Detection of a Denial of Service Attack":[],
+    "Detection of a Non-Standard Protocol or Event":[],
+    "Generic Protocol Command Decode":[],
+    "Access to a Potentially Vulnerable Web Application":[],
+    "Web Application Attack":[],
+    "Misc activity":[],
+    "Misc Attack":[],
+    "Generic ICMP event":[],
+    "Inappropriate Content was Detected":[],
+    "Potential Corporate Privacy Violation":[],
+    "Attempt to Login By a Default Username and Password":[]}
 
 ###################
 # TimeWindow
@@ -141,7 +175,7 @@ class TimeWindow(object):
                 srcdict[src_ip] = ports
                 self.port_combinations[dst_ip] = srcdict
                 #print 'New dst IP {}, attacked from srcip {} on port {}'.format(dst_ip, src_ip, destport)
-
+    """
     def get_json(self):
         """
         Returns the json representation of the data in this time window
@@ -161,7 +195,7 @@ class TimeWindow(object):
         #data['port_combinations'] = self.get_port_combination_lines
         json_result = json.dumps(data)
         return json_result
-
+    """
     def get_data_as_dict(self):
         data = {}
         data["Alerts Categories"] = self.categories
@@ -350,7 +384,7 @@ class Extractor(object):
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
         counter = 0;
-        print("Starting at line:{}".format(self.line_number))
+        #print("Starting at line:{}".format(self.line_number))
         with open(self.file) as lines:
             for line in islice(lines, self.line_number, None): #skip the lines we already inspected
                 self.process_line(line,self.timewindow)
