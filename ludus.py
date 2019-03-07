@@ -41,8 +41,26 @@ import os
 import signal
 VERSION = "0.6"
 
+
 known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']
 
+def colored(text,color):
+    CRED = '\033[91m'
+    CEND = '\033[0m'
+    CGREEN = '\033[92m'
+    CYELLOW = '\033[93m'
+    CBLUE = '\033[94m'
+
+    if color == "green":
+        return CGREEN + text + CEND
+    elif color == "red":
+        return CRED + text + CEND
+    elif color == "yellow":
+        return CYELLOW + text + CEND
+    elif color == "blue":
+        return CBLUE + text + CEND
+    else:
+        return text
 
 class Sendline():
     TOPIC=b"sentinel/collect/ludus"
@@ -138,13 +156,12 @@ class Ludus(object):
         #self.json_file = self.config_parser.get('output', 'filename')
         try:
             self.tw_length = self.config_parser.getint('settings', 'timeout')
-            print("TW LEN", self.tw_length)
         except NoOptionError:
-            print("Option 'timeout' not found! Using DEFAULT value 60 insted.")
             self.tw_length = 60
+            print(colored(f"Option 'timeout' not found! Using DEFAULT value {self.tw_length} insted.", "red"))
         except ValueError:
-            print("Unsupported value in field 'timeout' (expected int)! Using DEFAULT value 60 insted.")
             self.tw_length = 60
+            print(colored(f"Unsupported value in field 'timeout' (expected int)! Using DEFAULT value {self.tw_length} insted.", "red"))
         try:
             self.use_suricata = self.config_parser.getboolean('suricata', 'allow')
         except ValueError:
@@ -274,7 +291,7 @@ class Ludus(object):
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
         suggested_honeypots = get_strategy(self.production_ports,self.active_honeypots,self.strategy_file)
-        print("{} is suggested strategy for port combination {}".format(self.production_ports, suggested_honeypots))
+        #print("{} is suggested strategy for port combination {}".format(self.production_ports, suggested_honeypots))
         #apply strategy
         self.apply_strategy(suggested_honeypots)
         self.tw_start = time.time()
@@ -295,8 +312,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     #start the tool
-    print(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n")
-    print(f"\nVersion {VERSION}\n")
+    print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
+    print(colored(f"\nVersion {VERSION}\n", "blue"))
 
 
 
@@ -310,22 +327,22 @@ if __name__ == '__main__':
     else:
         try:
             if(len(out) == 0): #no running suricata
-                print("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.")
+                print(colored("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.", "red"))
                 suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
-            print("PID",ludus.suricata_pid)
+            if ludus.suricata_pid:
+                print(colored("Suricata is running", "green"))
             #start Volumeter
-            print(list(ludus.router_ip))
             volumeter_process = vol.Volumeter(ludus.router_ip,53333) 
             volumeter_process.start()
-
-            print("Volumeter started")
+            #read configuration
+            ludus.read_configuration()
             #everything is set, start ludus
-            print("Started on {}\n".format(datetime.datetime.now()))
+            print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
             ludus.start()
 
         except KeyboardInterrupt:
             end_flag.set()
             ludus.s.close()
             volumeter_process.join()
-            print("\nLeaving Ludus")
+            print(colored("\nLeaving Ludus", "blue"))

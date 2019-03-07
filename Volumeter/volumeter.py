@@ -81,7 +81,6 @@ class Counter(multiprocessing.Process):
         self.socket.setblocking(0)
         self.socket.bind(("localhost", port))
         self.socket.listen(5)
-        print("Router IP:",self.router_ip)
 
     def process_event(self,string):
         """Parses the events from conntrack and stores the volumes (pkts, bytes). Port class is used as a container"""
@@ -252,15 +251,13 @@ class Volumeter(multiprocessing.Process):
         #create new process
         counter = Counter(queue, self.address, self.port,exit_flag)
         #start it
-        print("Staring counter:{}".format(datetime.datetime.now()))
         counter.start()
         try:
-            process=subprocess.Popen(['conntrack','-E','-o','timestamp'],stdout=subprocess.PIPE)
+            process=subprocess.Popen(['conntrack','-E','-o','timestamp'],stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             for line in iter(process.stdout.readline, b''):
                  queue.put(line)
             process.stdout.close()
         except KeyboardInterrupt:
-            print("\nInterrupting volumeter")
             process.terminate()
             counter.join()
 

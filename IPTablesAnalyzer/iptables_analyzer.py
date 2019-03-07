@@ -128,7 +128,7 @@ def parse_chain(chain):
 		else:
 			return None
 
-def process_production_ports(verbose=0):
+def process_production_ports(verbose=1):
 	if verbose > 0:
 		print("\nACTIVE PRODUCTION PORTS:")
 	production_ports = []
