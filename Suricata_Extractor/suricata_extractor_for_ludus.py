@@ -4,17 +4,16 @@
 #           Ondrej Lukas. ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
 
 import sys
-from datetime import datetime
-from datetime import timedelta
 import argparse
 import time
-from os.path import isfile, join
+import os
 import json
-from pprint import pprint
 import math
-from multiprocessing import Queue
 import multiprocessing
-from itertools import islice
+from datetime import datetime
+from datetime import timedelta
+#from os.path import isfile, join
+from multiprocessing import Queue
 version = '0.3.2'
 
 
@@ -81,12 +80,36 @@ class TimeWindow(object):
         self.final_count_per_dst_ip = {}
         # bandwidth = {dstport: [mbits]}
         self.bandwidth = {}
+        self.flows = {}
+        self.packets_per_port = {}
+        self.bytes_per_port = {}
 
-    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient):
+    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient):
         """
         Receive a flow and use it
         """
-        if 'TCP' in proto:
+        if proto == "tpc" or proto == "udp":
+            if dst_ip == "147.32.83.158": #TODO
+                #print(proto, src_ip,dst_ip)
+                #save flow
+                try:
+                    self.flows[src_ip,proto,dstport][0] += bytes_toserver
+                    self.flows[src_ip,proto,dstport][1] += bytes_toclient
+                    self.flows[src_ip,proto,dstport][2] += pkts_toserver
+                    self.flows[src_ip,proto,dstport][3] += pkts_toclient
+                except KeyError:
+                    self.flows[src_ip,proto,dstport] = [bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient]
+                #save port volumes
+                try:
+                    self.packets_per_port[proto, dstport][0] += pkts_toserver
+                    self.packets_per_port[proto, dstport][1] += pkts_toclient
+                    self.bytes_per_port[proto, dstport][0] += bytes_toserver
+                    self.bytes_per_port[proto, dstport][1] += bytes_toclient
+                except KeyError:
+                    self.packets_per_port[proto, dstport] = [pkts_toserver, pkts_toclient]
+                    self.bytes_per_port[proto, dstport] = [bytes_toserver, bytes_toclient]
+
+        if 'tcp' in proto:
             try:
                 data = self.bandwidth[dstport]
                 self.bandwidth[dstport] += bytes_toserver + bytes_toclient
@@ -175,26 +198,7 @@ class TimeWindow(object):
                 srcdict[src_ip] = ports
                 self.port_combinations[dst_ip] = srcdict
                 #print 'New dst IP {}, attacked from srcip {} on port {}'.format(dst_ip, src_ip, destport)
-    """
-    def get_json(self):
-        
-        #Returns the json representation of the data in this time window
-        data = {}
-        data["Alerts Categories"] = self.categories
-        data["# Uniq Signatures"] = len(self.signatures)
-        data["# Severity 1"] = self.severities[list(self.severities)[0]]
-        data["# Severity 2"] = self.severities[list(self.severities)[1]]
-        data["# Severity 3"] = self.severities[list(self.severities)[2]]
-        data["# Severity 4"] = self.severities[list(self.severities)[3]]
-        data["Alerts/DstPort"] = self.dst_ports
-        data["Alerts/SrcPort"] = self.src_ports
-        data["Alerts/SrcIP"] = self.src_ips
-        data["Alers/DstIP"] = self.dst_ips
-        data["Per SrcPort"] = self.src_ports
-        #data['port_combinations'] = self.get_port_combination_lines
-        json_result = json.dumps(data)
-        return json_result
-    """
+
     def get_data_as_dict(self):
         data = {}
         data["Alerts Categories"] = self.categories
@@ -208,40 +212,16 @@ class TimeWindow(object):
         data["Alerts/SrcBClassNet"] = self.src_ips
         data["Alerts/DstBClassNet"] = self.dst_ips
         data["Per SrcPort"] = self.src_ports
+        data["flows"] = self.flows
+        data["packets_per_port"] = self.packets_per_port
+        data["bytes_per_port"] = self.bytes_per_port
         return data
-
-    def count_port_combinations(self):
-        """
-        Compute the amount of attackers attacking each port combination on each dst ip
-        """
-        self.final_count_per_dst_ip = {}
-        final_ports_counts = {}
-        for dst_ip in self.port_combinations:
-            for src_ip in self.port_combinations[dst_ip]:
-                # We count precisely who attacks ports 22,80, ... no 22,80,443 as also 22,80
-                portscom = str(self.port_combinations[dst_ip][src_ip]).replace('[','').replace(']','')
-                try:
-                    amount = final_ports_counts[portscom]
-                    amount += 1
-                    final_ports_counts[portscom] = amount
-                except KeyError:
-                    amount = 1
-                    final_ports_counts[portscom] = amount
-            self.final_count_per_dst_ip[dst_ip] = final_ports_counts
-            final_ports_counts = {}
-    
-    def get_port_combination_lines(self):
-        """
-        Call the combination of ports and return an object with all the info for this TW.
-        """
-        self.count_port_combinations()
-        return self.final_count_per_dst_ip
-
     def __repr__(self):
         return 'TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]])
 
     def printit(self):
-        print('TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]]))
+        pass    
+        #print('TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]]))
 
 def roundTime(dt=None, date_delta=timedelta(minutes=1), to='average'):
     """
@@ -263,42 +243,6 @@ def roundTime(dt=None, date_delta=timedelta(minutes=1), to='average'):
         rounding = (seconds + round_to / 2) // round_to * round_to
     return dt + timedelta(0, rounding - seconds, -dt.microsecond)
 
-def summarize_ports():
-    """
-    After all the tw finished, summarize the port combinations in all the TW and print it in a separate file
-    """
-    port_summary = {}
-    for tw in timewindows:
-        ports_data = timewindows[tw].final_count_per_dst_ip
-        for srcip in ports_data:
-            try:
-                #print 'Src IP: {}'.format(srcip)
-                # ports for this ip alredy in the global dict
-                srcip_ports = port_summary[srcip]
-                #print 'Ports com we already have: {}'.format(srcip_ports)
-                #print 'Ports com in the current tw: {}'.format(ports_data[srcip])
-                # for each port in the ports for the src ip in the current tw
-                for twport in ports_data[srcip]:
-                    try:
-                        # is this combination of ports in the global dict?
-                        amount = srcip_ports[twport]
-                        # yes, so add the new ports
-                        srcip_ports[twport] += ports_data[srcip][twport]
-                        #print 'We do have this comb. Updating to {}'.format(srcip_ports)
-                    except KeyError:
-                        # The new port combination is not in the global dict yet, just store the ports we have in the current tw
-                        srcip_ports[twport] = ports_data[srcip][twport]
-                        #print 'We do not have this comb. Updating to {}'.format(srcip_ports)
-                # update the global dict for this src ip
-                port_summary[srcip] = srcip_ports
-            except KeyError:
-                port_summary[srcip] = ports_data[srcip]
-    summaryportsfilename = '.'.join(args.json.split('.')[:-1]) + '.summary_ports'
-    summary_port_file = open(summaryportsfilename, 'w')
-    for srcip in port_summary:
-        summary_port_file.write(str(srcip) + ': ' + str(port_summary[srcip]) + '\n')
-    summary_port_file.close()
-
 class Extractor(object):
     """Class for extracting information and alerts from suricata outptu file eve.json"""
 
@@ -316,14 +260,10 @@ class Extractor(object):
         json_line = json.loads(line)
         #check if we are in the timewindow
         line_timestamp = datetime.strptime(json_line["timestamp"].split('+')[0], timeStampFormat)
-        if line_timestamp > timewindow.start:
-            if line_timestamp <= timewindow.end:
+        if line_timestamp > timewindow.start or True:
+            if line_timestamp <= timewindow.end or True:
                 if "alert" not in json_line["event_type"] and "flow" not in json_line["event_type"]:
                     return False
-                """
-                if args.dstnet and args.dstnet not in json_line['dest_ip']:
-                    return False
-                """
                 # forget the timezone for now with split
                 try:
                     col_time = json_line["timestamp"].split('+')[0]
@@ -362,8 +302,9 @@ class Extractor(object):
                 if 'alert' in json_line["event_type"]:
                     timewindow.add_alert(col_category, col_severity, col_signature, col_srcip, col_dstip, col_srcport, col_dstport)
                 elif 'flow' in json_line["event_type"]:
+                    #print("FLOW PROCESSING")
                     try:
-                        col_proto = json_line["proto"]
+                        col_proto = json_line["proto"].lower()
                     except KeyError:
                         col_proto = ''
                     try:
@@ -374,7 +315,15 @@ class Extractor(object):
                         col_bytes_toclient = json_line["flow"]["bytes_toclient"]
                     except KeyError:
                         col_bytes_toclient = ''
-                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient)
+                    try:
+                        col_pkts_toserver = json_line["flow"]["pkts_toserver"]
+                    except KeyError:
+                        col_pkts_toserver = ''
+                    try:
+                        col_pkts_toclient = json_line["flow"]["pkts_toclient"]
+                    except KeyError:
+                        col_pkts_toclient = ''
+                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient)
             else: #we are out of TimeWindow
                 self.last_timestamp = line_timestamp
                 print("Out of TW")
@@ -384,10 +333,12 @@ class Extractor(object):
         #Check if there is a better way of iterate through file
         counter = 0;
         #print("Starting at line:{}".format(self.line_number))
+        print(f"Starting reading of the suricata file :{self.file}")
         with open(self.file) as lines:
-            for line in islice(lines, self.line_number, None): #skip the lines we already inspected
+            for line in lines: #skip the lines we already inspected
+                #print(line)
                 self.process_line(line,self.timewindow)
                 counter+=1
-        #self.line_number += counter
-        print("Number of processed lines:{}".format(counter))
+        self.line_number += counter
+        print("################### Number of processed lines:{} , size:{}##########################".format(counter, os.path.getsize(self.file)))
         return self.timewindow.get_data_as_dict()
