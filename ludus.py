@@ -24,14 +24,8 @@ import time, threading, datetime
 import sys
 import subprocess
 import argparse
-import Strategizer.strategy_generator as generator
+import Strategizer.generator as generator
 import IPTablesAnalyzer.iptables_analyzer
-import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
-from Volumeter.volumeter_client import Volumeter_client
-import configparser
-from configparser import NoOptionError
-import Volumeter.volumeter as vol
-from multiprocessing import Process
 import zmq
 import msgpack
 import time
@@ -39,10 +33,17 @@ import multiprocessing
 import sched
 import os
 import signal
+import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
+from Volumeter.volumeter_client import Volumeter_client
+import configparser
+from configparser import NoOptionError
+#import Volumeter.volumeter as vol
+from multiprocessing import Process
 VERSION = "0.6"
 
 
-known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']
+#known_honeypots = ['22', '23', '8080', '2323', '80', '3128', '8123']
+known_honeypots = [22, 23, 8080, 2323, 80, 3128, 8123]
 
 def colored(text,color):
     CRED = '\033[91m'
@@ -79,7 +80,7 @@ class Sendline():
 def open_honeypot(port, known_honeypots, protocol='tcp'):
     if port in known_honeypots:
         #ssh HP
-        if port == '22':
+        if port == 22:
             command = '/etc/init.d/haas-proxy start'
         #minipot
         else:
@@ -93,11 +94,12 @@ def close_honeypot(port,known_honeypots, protocol='tcp'):
     #is the port among the known honeypots
     if port in known_honeypots:
         #is it ssh
-        if port == '22':
-            subprocess.Popen('iptables -t nat -D zone_wan_prerouting 1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+        if port == 22:
+            #subprocess.Popen('iptables -t nat -D zone_wan_prerouting 1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
             command = '/etc/init.d/haas-proxy stop'
         #no, its one of the minipot
         else:
+            #TODO BETTER HANDELING THE RULE NUMBERS
             command = 'uci del_list ucollect.fakes.disable='+port+protocol
     #no, it is TARPIT
     else:
@@ -108,14 +110,16 @@ def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
     #build the string
     if(len(path_to_strategy) > 0):
+        """
         ports_s = ''
         for item in ports:
             ports_s += (str(item)+',')
         #get rid of the last comma
         ports_s = ports_s[0:-1]
-        
+        """
         #get strategy
-        suggested_honeypots = generator.get_strategy(ports_s,path_to_strategy)
+        defender = generator.Defender(path_to_strategy)
+        suggested_honeypots = defender.get_strategy(ports)
         return suggested_honeypots
     else: #no strategy file, do nothing
         return []
@@ -124,13 +128,13 @@ def get_ports_information():
     data = IPTablesAnalyzer.iptables_analyzer.get_output()
     production_ports = []
     honeypots = []
-    for key in data:
+    for protocol,key in data:
         #get active ports
-        if data[key] == 'accepted' or data[key] == 'production':
-            production_ports.append(key)
+        if data[protocol, key] == 'accepted' or data[protocol,key] == 'production':
+            production_ports.append((protocol,key))
         #get honeypots
-        if data[key] == 'honeypot-turris':
-            honeypots.append(key)
+        if data[protocol, key] == 'honeypot-turris':
+            honeypots.append((protocol,key))
     return (production_ports, honeypots)
 
 class Ludus(object):
@@ -140,8 +144,8 @@ class Ludus(object):
         self.config_parser = parser = configparser.ConfigParser()
         self.config_file = config_file
         self.flag = flag
-        self.suricata_log = "/var/log/suricata/eve.json"
-        self.suricata_tmp_log = "/var/log/suricata/suricata_log.json"
+        self.suricata_log = "/root/log/suricata/eve.json"
+        self.suricata_tmp_log = "/root/log/suricata/suricata_log.json"
         self.suricat_extractor = s_extractor.Extractor(self.suricata_tmp_log)
         self.tw_start = None
         self.read_configuration()
@@ -192,58 +196,36 @@ class Ludus(object):
             #no action required
             pass
 
-    def generate_output(self,suricata_data, volumeter_data):
+    def generate_output(self,suricata_data):
+        port_info = {}
+        #TODO add port info for hp/production with no flows
+        for (protocol, dport),(pkts_toserver, pkts_toclient) in suricata_data["packets_per_port"].items():
+            port_info[protocol,dport] = {"pkts_to_server":pkts_toserver, "pkts_to_client": pkts_toclient}
+            if (protocol,dport) in self.production_ports.keys():
+                port_info[protocol, dport]["status"] = "production"
+            elif (protocol,dport) in self.active_honeypots.keys():
+                port_info[protocol, dport]["status"] = "honeypot"
+            else:
+                port_info[protocol, dport]["status"] = "closed"
+            #add bytes volumes
+            port_info[protocol, dport]["bytes_to_server"] = suricata_data["bytes_per_port"][protocol, dport][0]
+            port_info[protocol, dport]["bytes_to_client"] = suricata_data["bytes_per_port"][protocol, dport][1]
         output = {}
         output["tw_start"] = datetime.datetime.fromtimestamp(self.tw_start).isoformat(' ')
         output["tw_end"] = datetime.datetime.fromtimestamp(self.tw_end).isoformat(' ')
-        #STORE PORT INFORMATION
-        portInfo = {}
-        #TCP
-        tcp_ports = {}
-        ports = set()
-        #get all ports we saw in the TW
-        ports.update(int(x) for x in volumeter_data['tcp'].keys())
-        ports.update(suricata_data["Alerts/DstPort"].keys())
-        ports.update(self.active_honeypots)
-        ports.update(self.production_ports)
-        #determine type of each port and prepare structure
-        for p in ports:
-            if p in self.active_honeypots:
-                tcp_ports[p] = {"type":"Honeypot", "bytes":0, "packets":0, "flows":-1, "#Alerts":0}
-            elif p in self.production_ports:
-                tcp_ports[p] = {"type":"Production","bytes":0, "packets":0, "flows":-1, "#Alerts":0}
-            else:
-                tcp_ports[p] = {"type":"Unknown","bytes":0, "packets":0, "flows":-1, "#Alerts":0}
-        #update volumes
-        for p in volumeter_data['tcp'].keys():
-            tcp_ports[p]["bytes"] = volumeter_data["tcp"][p]["bytes"]
-            tcp_ports[p]["packets"] = volumeter_data["tcp"][p]["packets"]
-        #update alerts
-        for p in suricata_data["Alerts/DstPort"].keys():
-            tcp_ports[p]["#Alerts"] = suricata_data["Alerts/DstPort"][p]
-        udp_ports = {}
-        portInfo["UDP"] = udp_ports
-        portInfo["TCP"] = tcp_ports
-        output["PortInfo"] = portInfo
-
-        ## STORE ALERTS FROM SURICATA
-        #store information about alerts from suricata
+        output["port_info"] = port_info
         output["honeypots"] = self.active_honeypots
         output["production_ports"] = self.production_ports
+        output["flows"] = suricata_data["flows"]
         output["GameStrategyFileName"] = self.strategy_file
         output["alerts"] = suricata_data
-        output["volumeter_data"] = volumeter_data
         output["suricata_data"] = suricata_data
-        output["alerts"] = suricata_data
         return output
 
     def run(self):
-        print(f"-------start: {datetime.datetime.fromtimestamp(self.tw_start)}-------")
+        #print(f"-------start: {datetime.datetime.fromtimestamp(self.tw_start)}-------")
         self.tw_end = time.time()
         next_start = self.tw_end
-        #get data from Volumeter
-        #volumeter_data = {"tcp":{}, "udp":{}}
-        volumeter_data = self.volumeter_client.get_data_and_reset()
         try:
             os.rename(self.suricata_log, self.suricata_tmp_log)
             os.kill(self.suricata_pid, signal.SIGHUP)
@@ -251,7 +233,12 @@ class Ludus(object):
             suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end)
             os.remove(self.suricata_tmp_log)
         except FileNotFoundError:
-            suricata_data = {}
+            print(colored("Unable to locate the suricata log!","red"))
+            suricata_data = None
+        print("Suricata")
+        if suricata_data:
+            print(suricata_data["flows"])
+        print("---------------------------------------------")
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
         old_strategy = self.strategy_file
@@ -270,7 +257,7 @@ class Ludus(object):
             self.apply_strategy(suggested_honeypots)
         
         #store the information in the file
-        output = self.generate_output(suricata_data, volumeter_data)
+        output = self.generate_output(suricata_data)
 
         #-------------------------
         #REMOVE BEFORE PUBLISHING
@@ -280,7 +267,7 @@ class Ludus(object):
         self.s.sendline(output) #potom takhle odesilas data
 
         self.tw_start = self.tw_end
-        print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
+        #print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
 
     
@@ -327,14 +314,11 @@ if __name__ == '__main__':
     else:
         try:
             if(len(out) == 0): #no running suricata
-                print(colored("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.", "red"))
+                print(colored("Suricata is required for running Ludus. Starting suricata with default configuration.", "red"))
                 suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
             if ludus.suricata_pid:
                 print(colored("Suricata is running", "green"))
-            #start Volumeter
-            volumeter_process = vol.Volumeter(ludus.router_ip,53333) 
-            volumeter_process.start()
             #read configuration
             ludus.read_configuration()
             #everything is set, start ludus
@@ -344,5 +328,5 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             end_flag.set()
             ludus.s.close()
-            volumeter_process.join()
+            subprocess.check_output(["kill", ludus.suricata_pid])
             print(colored("\nLeaving Ludus", "blue"))
