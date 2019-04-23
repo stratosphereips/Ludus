@@ -7,7 +7,7 @@ import json
 import argparse
 
 
-version = 0.2
+version = "0.2"
 """
 	Extracts amount of bytes and packets in mangle table
 """
@@ -52,7 +52,7 @@ def process_honeypots(verbose=0):
 							bytes = data[1]
 							if verbose > 0:
 								print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[10], rule[3], packets, bytes))
-							hp_ports.append(rule[9])
+							hp_ports.append((rule[9], rule[3]))
 	
 	#check if there are any TARPIT honeypots
 	#chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
@@ -68,7 +68,7 @@ def process_honeypots(verbose=0):
 					if rule[2].lower() == "tarpit":
 						if verbose > 0:
 							print("\tPORT: {}, TARPIT, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[3], rule[0],rule[1]))
-						hp_ports.append(rule[9])
+						hp_ports.append((rule[9], rule[3]))
 	#check if haas is active
 	#chains = subprocess.Popen('iptables -vnL -t nat | grep DNAT', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 	result = subprocess.run('iptables -vnL -t nat | grep DNAT', stdout=subprocess.PIPE,shell=True)
@@ -79,7 +79,7 @@ def process_honeypots(verbose=0):
 			if  "haas" in rule:
 				if verbose > 0:
 					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1]))
-				hp_ports.append(rule[10])
+				hp_ports.append((rule[10], rule[3]))
 	return hp_ports						
 
 """
@@ -140,7 +140,7 @@ def process_production_ports(verbose=1):
 			if not "haas" in rule:
 				if verbose > 0:
 					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1]))
-				production_ports.append(rule[10])
+				production_ports.append((rule[10], rule[3]))
 	return production_ports
 	
 def parse_DNAT_chain(chain):
@@ -183,19 +183,19 @@ def process_accepted_ports(verbose=0):
 					if rule[2].lower() == "accept" and rule[3].lower() == 'tcp':
 						if verbose > 0:
 							print("\tPORT: {},PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[-1], rule[3], rule[0], rule[1]))
-						accepted_ports.append(rule[-1])
+						accepted_ports.append((rule[-1], rule[3]))
 	return accepted_ports
 
 def get_output(verbose=0):
 	output = {}
-	for port in process_honeypots(verbose):
-		output[int(port)] = 'honeypot-turris'
+	for port,protocol in process_honeypots(verbose):
+		output[protocol, int(port)] = 'honeypot-turris'
 	#get data from production ports (ports being redirected to the locat network)
-	for port in process_production_ports(verbose):
-		output[int(port)] = 'production'
+	for port,protocol in process_production_ports(verbose):
+		output[protocol, int(port)] = 'production'
 	#get data from accepted ports
-	for port in process_accepted_ports(verbose):
-		output[int(port)] = 'accepted'
+	for port,protocol in process_accepted_ports(verbose):
+		output[protocol, int(port)] = 'accepted'
 	return output
 
 if __name__ == '__main__':
@@ -220,6 +220,7 @@ if __name__ == '__main__':
 	for port in process_accepted_ports(args.verbose):
 		output[port] = 'accepted'
 	with open(args.folder+args.filename+'.json', 'w') as outfile:
-		json.dump(output, outfile)
+		#json.dump(output, outfile)
+		pass
 	if args.verbose > 1:
 		print("Results stored in '{}'.".format(args.folder+args.filename+'.json'))
