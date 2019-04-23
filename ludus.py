@@ -22,11 +22,10 @@
 
 
 #TODO:
-#   ip list instead of singe string
 #   log
 #   sample config file
 #   changes in suricata.yaml
-import time, threading, datetime
+import time,datetime
 import sys
 import subprocess
 import argparse
@@ -34,14 +33,12 @@ import Strategizer.generator as generator
 import IPTablesAnalyzer.iptables_analyzer
 import zmq
 import msgpack
-import time
 import multiprocessing
 import sched
 import os
 import signal
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
 import configparser
-from configparser import NoOptionError
 from multiprocessing import Process
 VERSION = "0.6"
 
@@ -155,7 +152,7 @@ class Ludus(object):
         #self.json_file = self.config_parser.get('output', 'filename')
         try:
             self.tw_length = self.config_parser.getint('settings', 'timeout')
-        except NoOptionError:
+        except configparser.NoOptionError:
             self.tw_length = 60
             print(colored(f"Option 'timeout' not found! Using DEFAULT value {self.tw_length} insted.", "red"))
         except ValueError:
@@ -227,6 +224,7 @@ class Ludus(object):
         self.tw_end = time.time()
         next_start = self.tw_end
         try:
+            #rotate suricata log file
             os.rename(self.suricata_log, self.suricata_tmp_log)
             os.kill(self.suricata_pid, signal.SIGHUP)
             #get data from Suricata-Extractor
@@ -234,7 +232,7 @@ class Ludus(object):
             os.remove(self.suricata_tmp_log)
         except FileNotFoundError:
             print(colored("Unable to locate the suricata log!","red"))
-            suricata_data = None
+            self.terminate(status=-1)
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
         old_strategy = self.strategy_file
@@ -275,7 +273,7 @@ class Ludus(object):
         out, err = process.communicate()
         if(len(err) > 0): #something wrong with the suricata running test
             print(colored("Error while testing if suricata is running.","red"))
-            self.s.sendline.close()
+            self.terminate(-1)
             sys.exit(-1)
         else:
             if(len(out) == 0): #no running suricata
@@ -287,7 +285,7 @@ class Ludus(object):
                     print(colored("Suricata started", "green"))
                 else:
                     print(colored("Error while starting suricata","red"))
-                    self.s.sendline.close()                    
+                    self.terminate(-1)                    
                     sys.exit(-1)
         #start            
         print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
@@ -306,7 +304,18 @@ class Ludus(object):
         self.scheduler.run()
         
         #terminate the connection to DB
-        self.s.close() #na konci zavolas tohle.
+        self.terminate()
+
+    def terminate(self,status=0):
+        #close sentinel connection
+        self.s.close()
+        #kill suricata
+        if self.suricata_pid:
+            subprocess.check_output(["kill", str(ludus.suricata_pid)])
+        if status == 0:
+            print(colored("\nLeaving Ludus", "blue"))
+        else:
+            print(colored("\nError, terminating Ludus", "red"))
 
 if __name__ == '__main__':
 
@@ -343,6 +352,9 @@ if __name__ == '__main__':
         # start ludus
         ludus.start()
     except KeyboardInterrupt:
+        """
         ludus.s.close()
         subprocess.check_output(["kill", str(ludus.suricata_pid)])
         print(colored("\nLeaving Ludus", "blue"))
+        """
+        ludus.terminate(-1)
