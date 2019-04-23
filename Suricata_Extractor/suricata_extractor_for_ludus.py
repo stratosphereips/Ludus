@@ -88,9 +88,10 @@ class TimeWindow(object):
         """
         Receive a flow and use it
         """
-        if proto == "tpc" or proto == "udp":
+        #print( src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient)
+        if proto == "tcp" or proto == "udp":
             if dst_ip == "147.32.83.158": #TODO
-                #print(proto, src_ip,dst_ip)
+                #print("OK")
                 #save flow
                 try:
                     self.flows[src_ip,proto,dstport][0] += bytes_toserver
