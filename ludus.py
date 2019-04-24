@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #  Copyright (C) 2017  Sebastian Garcia, Ondrej Lukas
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 # This file is part of the Stratosphere Linux IPS project. https://stratosphereips.org
 
 # Author:
-# Ondrej Lukas - ondrej.lukas95@gmail.com , lukasond@fel.cvut.cz 
+# Ondrej Lukas - ondrej.lukas95@gmail.com , lukasond@fel.cvut.cz
 
 import time, threading, datetime
 import sys
@@ -113,7 +113,7 @@ def get_strategy(ports, active_honeypots, path_to_strategy):
             ports_s += (str(item)+',')
         #get rid of the last comma
         ports_s = ports_s[0:-1]
-        
+
         #get strategy
         suggested_honeypots = generator.get_strategy(ports_s,path_to_strategy)
         return suggested_honeypots
@@ -174,7 +174,7 @@ class Ludus(object):
             self.router_ip="unknown"
 
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
-        #close previously opened HP which we do not want anymore               
+        #close previously opened HP which we do not want anymore
         try:
             for port in suggested_honeypots:
                 if port not in self.active_honeypots:
@@ -187,7 +187,7 @@ class Ludus(object):
             #open the Honeypots on suggested ports
             for port in suggested_honeypots:
                 if port not in self.active_honeypots:
-                    open_honeypot(port,known_honeypots)   
+                    open_honeypot(port,known_honeypots)
         except TypeError:
             #no action required
             pass
@@ -259,7 +259,7 @@ class Ludus(object):
         self.read_configuration()
 
         #get the information about ports in use
-        (production_ports, active_hp) = get_ports_information()  
+        (production_ports, active_hp) = get_ports_information()
         #do we need to change the defence_strategy?
         if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
             #update the settings
@@ -268,7 +268,7 @@ class Ludus(object):
             #get strategy
             suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
             self.apply_strategy(suggested_honeypots)
-        
+
         #store the information in the file
         output = self.generate_output(suricata_data, volumeter_data)
 
@@ -283,10 +283,10 @@ class Ludus(object):
         print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
 
-    
+
     def start(self):
         """Main loop"""
-        
+
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
@@ -299,7 +299,7 @@ class Ludus(object):
         self.next_call = self.tw_start
         self.scheduler.enter(self.tw_length, 1, self.run)
         self.scheduler.run()
-        
+
         #terminate the connection to DB
         self.s.close() #na konci zavolas tohle.
 
@@ -310,7 +310,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
     parser.add_argument('-p', '--volumeter_port', help='Port to listen on to get data from Volumeter', action='store', default=53333, required=False, type=int)
     args = parser.parse_args()
-    
+
     #start the tool
     print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
     print(colored(f"\nVersion {VERSION}\n", "blue"))
@@ -333,7 +333,7 @@ if __name__ == '__main__':
             if ludus.suricata_pid:
                 print(colored("Suricata is running", "green"))
             #start Volumeter
-            volumeter_process = vol.Volumeter(ludus.router_ip,53333) 
+            volumeter_process = vol.Volumeter(ludus.router_ip,53333)
             volumeter_process.start()
             #read configuration
             ludus.read_configuration()

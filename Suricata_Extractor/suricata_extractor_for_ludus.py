@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/python3 -u
 # See the file 'LICENSE' for copying permission.
 # Authors:  Sebastian Garcia. eldraco@gmail.com , sebastian.garcia@agents.fel.cvut.cz
 #           Ondrej Lukas. ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
@@ -100,7 +100,7 @@ class TimeWindow(object):
         """
         def get_B_class_network(ip):
             splitted = ip.split(".")
-            return "{}.{}".format(splitted[0], splitted[1]) 
+            return "{}.{}".format(splitted[0], splitted[1])
         # Categories
         if category == '':
             try:
@@ -177,7 +177,7 @@ class TimeWindow(object):
                 #print 'New dst IP {}, attacked from srcip {} on port {}'.format(dst_ip, src_ip, destport)
     """
     def get_json(self):
-        
+
         #Returns the json representation of the data in this time window
         data = {}
         data["Alerts Categories"] = self.categories
@@ -229,7 +229,7 @@ class TimeWindow(object):
                     final_ports_counts[portscom] = amount
             self.final_count_per_dst_ip[dst_ip] = final_ports_counts
             final_ports_counts = {}
-    
+
     def get_port_combination_lines(self):
         """
         Call the combination of ports and return an object with all the info for this TW.
@@ -378,7 +378,7 @@ class Extractor(object):
             else: #we are out of TimeWindow
                 self.last_timestamp = line_timestamp
                 print("Out of TW")
-                
+
     def get_data(self, tw_start, tw_end):
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
