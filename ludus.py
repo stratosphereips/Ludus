@@ -25,6 +25,7 @@
 #   log
 #   sample config file
 #   changes in suricata.yaml
+#   check if sentinel is running
 import time,datetime
 import sys
 import subprocess
@@ -40,7 +41,7 @@ import signal
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
 import configparser
 from multiprocessing import Process
-VERSION = "0.6"
+VERSION = "0.7"
 
 
 #known_honeypots = ['22', '23', '8080', '2323', '80', '3128', '8123']
@@ -142,7 +143,8 @@ class Ludus(object):
         self.tw_start = None
         self.read_configuration()
         self.next_call = 0
-        self.s = Sendline() 
+        self.s = Sendline()
+        self.suricata_pid = None
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
@@ -189,35 +191,47 @@ class Ludus(object):
             pass
 
     def generate_output(self,suricata_data):
-        port_info = {}
-        #TODO add port info for hp/production with no flows
+        port_info = []
+        used = set()
         for (protocol, dport),(pkts_toserver, pkts_toclient) in suricata_data["packets_per_port"].items():
-            port_info[protocol,dport] = {"pkts_to_server":pkts_toserver, "pkts_to_client": pkts_toclient}
+            tmp = {"port": dport, "protocol":protocol, "pkts_to_server":pkts_toserver, "pkts_to_client": pkts_toclient}
             if (protocol,dport) in self.production_ports:
-                port_info[protocol, dport]["status"] = "production"
+                tmp["status"] = "production"
             elif (protocol,dport) in self.active_honeypots:
-                port_info[protocol, dport]["status"] = "honeypot"
+                tmp["status"] = "honeypot"
             else:
-                port_info[protocol, dport]["status"] = "closed"
+                tmp["status"] = "closed"
             #add bytes volumes
-            port_info[protocol, dport]["bytes_to_server"] = suricata_data["bytes_per_port"][protocol, dport][0]
-            port_info[protocol, dport]["bytes_to_client"] = suricata_data["bytes_per_port"][protocol, dport][1]
+            tmp["bytes_to_server"] = suricata_data["bytes_per_port"][protocol, dport][0]
+            tmp["bytes_to_client"] = suricata_data["bytes_per_port"][protocol, dport][1]
+            used.add((protocol, dport))
+            port_info.append(tmp)
         for x in self.active_honeypots:
-            if x not in port_info:
-                port_info[x] = {"status":"honeypot", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0}
+            if x not in used:
+                port_info.append({"status":"honeypot", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
         for x in self.production_ports:
-            if x not in port_info:
-                port_info[x] = {"status":"production", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0}
+            if x not in used:
+                port_info.append({"status":"production", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
+
+        flows = []
+        for flow_id, data in suricata_data["flows"].items():
+            if flow_id in suricata_data["alerts"].keys():
+                tmp = {"severity": suricata_data["alerts"][flow_id]["severity"], "category":suricata_data["alerts"][flow_id]["category"], "signature":suricata_data["alerts"][flow_id]["signature"]}
+                data["alert"] = tmp
+            else:
+                data["alert"] = False
+                #print(data)
+            flows.append(data)
+
         output = {}
         output["tw_start"] = datetime.datetime.fromtimestamp(self.tw_start).isoformat(' ')
         output["tw_end"] = datetime.datetime.fromtimestamp(self.tw_end).isoformat(' ')
         output["port_info"] = port_info
-        output["honeypots"] = self.active_honeypots
-        output["production_ports"] = self.production_ports
-        output["flows"] = suricata_data["flows"]
+        #output["honeypots"] = self.active_honeypots
+        #output["production_ports"] = self.production_ports
+        output["flows"] = flows
         output["GameStrategyFileName"] = self.strategy_file
-        output["alerts"] = suricata_data
-        output["suricata_data"] = suricata_data
+        #output["suricata_data"] = suricata_data
         return output
 
     def run(self):
@@ -253,10 +267,13 @@ class Ludus(object):
         #store the information in the file
         output = self.generate_output(suricata_data)
 
-        #-------------------------
-        #REMOVE BEFORE PUBLISHING
-        print(output)
-        #-------------------------
+        ###########################
+        #-------------------------#
+        #REMOVE BEFORE PUBLISHING #
+        print(output)             #
+        #-------------------------#
+        ###########################
+
         #send data with Sentinel
         self.s.sendline(output)
 
