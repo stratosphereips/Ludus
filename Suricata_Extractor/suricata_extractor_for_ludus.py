@@ -61,46 +61,16 @@ class TimeWindow(object):
     def __init__(self, tw_start,tw_end):
         self.start = datetime.fromtimestamp(tw_start)
         self.end = datetime.fromtimestamp(tw_end)
-
-        #self.categories = {}
-        #self.severities = {}
-        #self.severities[1] = 0
-        #self.severities[2] = 0
-        #self.severities[3] = 0
-        #self.severities[4] = 0
-
-        #self.signatures = {}
-        #self.src_ips = {}
-        #self.dst_ips = {}
-        #self.src_ports = {}
-        #self.dst_ports = {}
-        # port_combinations will be: {dstip: {srcip: [1st port, 2nd port]}}
-        #self.port_combinations = {}
-        #self.final_count_per_dst_ip = {}
-        # bandwidth = {dstport: [mbits]}
-        #self.bandwidth = {}
         self.flows = {}
         self.alerts = {}
         self.packets_per_port = {}
         self.bytes_per_port = {}
 
-    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id):
-        """
-        Receive a flow and use it
-        """
-        #print(src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip)
+    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id): 
+        #Receive a flow and use it
         if proto in ["tcp", "udp"]:
             if dst_ip in target_destination_ip:
                 #save flow
-                """
-                try:
-                    self.flows[src_ip,proto,dstport][0] += bytes_toserver
-                    self.flows[src_ip,proto,dstport][1] += bytes_toclient
-                    self.flows[src_ip,proto,dstport][2] += pkts_toserver
-                    self.flows[src_ip,proto,dstport][3] += pkts_toclient
-                except KeyError:
-                    self.flows[src_ip,proto,dstport] = [bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient]
-                """
                 self.flows[flow_id] = {"src_ip":src_ip, "sport": srcport, "dport": dstport, "protcol": proto, "bytes_toclient":bytes_toclient, "bytes_toserver":bytes_toserver, "pkts_toserver":pkts_toserver, "pkts_toclient":pkts_toclient}
                 #save port volumes
                 try:
@@ -111,114 +81,16 @@ class TimeWindow(object):
                 except KeyError:
                     self.packets_per_port[proto, dstport] = [pkts_toserver, pkts_toclient]
                     self.bytes_per_port[proto, dstport] = [bytes_toserver, bytes_toclient]
-        """
-        if 'tcp' in proto:
-            try:
-                data = self.bandwidth[dstport]
-                self.bandwidth[dstport] += bytes_toserver + bytes_toclient
-            except KeyError:
-                self.bandwidth[dstport] = bytes_toserver + bytes_toclient
-        """
+
     def add_alert(self, category, severity, signature, src_ip,src_port, dst_ip, srcport, destport,flow_id):
         """
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
         """
-        #print("ALERT!!!!!!!!!!!")
-        #print(category, severity, signature, src_ip, dst_ip, srcport, destport)
         self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
-        """
-        def get_B_class_network(ip):
-            splitted = ip.split(".")
-            return "{}.{}".format(splitted[0], splitted[1]) 
-        # Categories
-        if category == '':
-            try:
-                self.categories["Unknown Traffic"] += 1
-            except KeyError:
-                self.categories["Unknown Traffic"] = 1
-        else:
-            try:
-                self.categories[category] += 1
-            except KeyError:
-                self.categories[category] = 1
-        # Severities
-        try:
-            self.severities[int(severity)] += 1
-        except KeyError:
-            self.severities[int(severity)] = 1
-        # Signatures
-        try:
-            self.signatures[signature] += 1
-        except KeyError:
-            self.signatures[signature] = 1
-        # Srcip
-        #extract B class network (mask 255.255.0.0)
 
-        try:
-            self.src_ips[get_B_class_network(src_ip)] += 1
-        except KeyError:
-            self.src_ips[get_B_class_network(src_ip)] = 1
-        # Dstip
-        try:
-            self.dst_ips[get_B_class_network(dst_ip)] += 1
-        except KeyError:
-            self.dst_ips[get_B_class_network(dst_ip)] = 1
-        # Srcport
-        try:
-            self.src_ports[srcport] += 1
-        except KeyError:
-            self.src_ports[srcport] = 1
-        # dstport
-        try:
-            self.dst_ports[destport] += 1
-        except KeyError:
-            self.dst_ports[destport] = 1
-
-        #port combination
-        if destport != '':
-            try:
-                srcdict = self.port_combinations[dst_ip]
-                try:
-                    # the dstip is there, the srcip is also there, just add the port
-                    ports = srcdict[src_ip]
-                    # We have this dstip, srcip, just add the port
-                    try:
-                        ports.index(destport)
-                    except ValueError:
-                        ports.append(destport)
-                    srcdict[src_ip] = ports
-                    self.port_combinations[dst_ip] = srcdict
-                    #print 'Added port {}, to srcip {} attacking dstip {}'.format(destport, src_ip, dst_ip)
-                except KeyError:
-                    # first time for this src_ip attacking this dst_ip
-                    ports = []
-                    ports.append(destport)
-                    srcdict[src_ip] = ports
-                    self.port_combinations[dst_ip] = srcdict
-                    #print 'New srcip {} attacking dstip {} on port {}'.format(src_ip, dst_ip, destport)
-            except KeyError:
-                # First time for this dst ip
-                ports = []
-                ports.append(destport)
-                srcdict = {}
-                srcdict[src_ip] = ports
-                self.port_combinations[dst_ip] = srcdict
-                #print 'New dst IP {}, attacked from srcip {} on port {}'.format(dst_ip, src_ip, destport)
-    """
     def get_data_as_dict(self):
         data = {}
-        #data["Alerts Categories"] = self.categories
-        #data["# Uniq Signatures"] = len(self.signatures)
-        #data["# Severity 1"] = self.severities[list(self.severities)[0]]
-        #data["# Severity 2"] = self.severities[list(self.severities)[1]]
-        #data["# Severity 3"] = self.severities[list(self.severities)[2]]
-        #data["# Severity 4"] = self.severities[list(self.severities)[3]]
-        #data["Alerts/DstPort"] = self.dst_ports
-        #data["Alerts/SrcPort"] = self.src_ports
-        #data["Alerts/SrcBClassNet"] = self.src_ips
-        #data["Alerts/DstBClassNet"] = self.dst_ips
-        #data["Per SrcPort"] = self.src_ports
         data["alerts"] = self.alerts
         data["flows"] = self.flows
         data["packets_per_port"] = self.packets_per_port
@@ -346,11 +218,10 @@ class Extractor(object):
     def get_data(self, tw_start, tw_end, target_destination_ip):
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
-        counter = 0;
-        print(f"Starting reading of the suricata file :{self.file}")
+        counter = 0
         with open(self.file) as lines:
             for line in lines: #skip the lines we already inspected
                 self.process_line(line,self.timewindow,target_destination_ip)
                 counter+=1
-        print("################### Number of processed lines:{} , size:{}##########################".format(counter, os.path.getsize(self.file)))
+        #print("################### Number of processed lines:{} , size:{}##########################".format(counter, os.path.getsize(self.file)))
         return self.timewindow.get_data_as_dict()
