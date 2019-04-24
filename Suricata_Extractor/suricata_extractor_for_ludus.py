@@ -3,17 +3,16 @@
 # Authors:  Sebastian Garcia. eldraco@gmail.com , sebastian.garcia@agents.fel.cvut.cz
 #           Ondrej Lukas. ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
 
+#TODO:
+# add srcport in flows
 import sys
-import argparse
 import time
 import os
 import json
 import math
-import multiprocessing
 from datetime import datetime
 from datetime import timedelta
 #from os.path import isfile, join
-from multiprocessing import Queue
 version = '0.3.2'
 
 
@@ -63,36 +62,37 @@ class TimeWindow(object):
         self.start = datetime.fromtimestamp(tw_start)
         self.end = datetime.fromtimestamp(tw_end)
 
-        self.categories = {}
-        self.severities = {}
-        self.severities[1] = 0
-        self.severities[2] = 0
-        self.severities[3] = 0
-        self.severities[4] = 0
+        #self.categories = {}
+        #self.severities = {}
+        #self.severities[1] = 0
+        #self.severities[2] = 0
+        #self.severities[3] = 0
+        #self.severities[4] = 0
 
-        self.signatures = {}
-        self.src_ips = {}
-        self.dst_ips = {}
-        self.src_ports = {}
-        self.dst_ports = {}
+        #self.signatures = {}
+        #self.src_ips = {}
+        #self.dst_ips = {}
+        #self.src_ports = {}
+        #self.dst_ports = {}
         # port_combinations will be: {dstip: {srcip: [1st port, 2nd port]}}
-        self.port_combinations = {}
-        self.final_count_per_dst_ip = {}
+        #self.port_combinations = {}
+        #self.final_count_per_dst_ip = {}
         # bandwidth = {dstport: [mbits]}
-        self.bandwidth = {}
+        #self.bandwidth = {}
         self.flows = {}
+        self.alerts = {}
         self.packets_per_port = {}
         self.bytes_per_port = {}
 
-    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient):
+    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id):
         """
         Receive a flow and use it
         """
-        #print( src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient)
-        if proto == "tcp" or proto == "udp":
-            if dst_ip == "147.32.83.158": #TODO
-                #print("OK")
+        #print(src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip)
+        if proto in ["tcp", "udp"]:
+            if dst_ip in target_destination_ip:
                 #save flow
+                """
                 try:
                     self.flows[src_ip,proto,dstport][0] += bytes_toserver
                     self.flows[src_ip,proto,dstport][1] += bytes_toclient
@@ -100,6 +100,8 @@ class TimeWindow(object):
                     self.flows[src_ip,proto,dstport][3] += pkts_toclient
                 except KeyError:
                     self.flows[src_ip,proto,dstport] = [bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient]
+                """
+                self.flows[flow_id] = {"src_ip":src_ip, "sport": srcport, "dport": dstport, "protcol": proto, "bytes_toclient":bytes_toclient, "bytes_toserver":bytes_toserver, "pkts_toserver":pkts_toserver, "pkts_toclient":pkts_toclient}
                 #save port volumes
                 try:
                     self.packets_per_port[proto, dstport][0] += pkts_toserver
@@ -109,18 +111,22 @@ class TimeWindow(object):
                 except KeyError:
                     self.packets_per_port[proto, dstport] = [pkts_toserver, pkts_toclient]
                     self.bytes_per_port[proto, dstport] = [bytes_toserver, bytes_toclient]
-
+        """
         if 'tcp' in proto:
             try:
                 data = self.bandwidth[dstport]
                 self.bandwidth[dstport] += bytes_toserver + bytes_toclient
             except KeyError:
                 self.bandwidth[dstport] = bytes_toserver + bytes_toclient
-
-    def add_alert(self, category, severity, signature, src_ip, dst_ip, srcport, destport):
+        """
+    def add_alert(self, category, severity, signature, src_ip,src_port, dst_ip, srcport, destport,flow_id):
         """
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
+        """
+        #print("ALERT!!!!!!!!!!!")
+        #print(category, severity, signature, src_ip, dst_ip, srcport, destport)
+        self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
         """
         def get_B_class_network(ip):
             splitted = ip.split(".")
@@ -199,20 +205,21 @@ class TimeWindow(object):
                 srcdict[src_ip] = ports
                 self.port_combinations[dst_ip] = srcdict
                 #print 'New dst IP {}, attacked from srcip {} on port {}'.format(dst_ip, src_ip, destport)
-
+    """
     def get_data_as_dict(self):
         data = {}
-        data["Alerts Categories"] = self.categories
-        data["# Uniq Signatures"] = len(self.signatures)
-        data["# Severity 1"] = self.severities[list(self.severities)[0]]
-        data["# Severity 2"] = self.severities[list(self.severities)[1]]
-        data["# Severity 3"] = self.severities[list(self.severities)[2]]
-        data["# Severity 4"] = self.severities[list(self.severities)[3]]
-        data["Alerts/DstPort"] = self.dst_ports
-        data["Alerts/SrcPort"] = self.src_ports
-        data["Alerts/SrcBClassNet"] = self.src_ips
-        data["Alerts/DstBClassNet"] = self.dst_ips
-        data["Per SrcPort"] = self.src_ports
+        #data["Alerts Categories"] = self.categories
+        #data["# Uniq Signatures"] = len(self.signatures)
+        #data["# Severity 1"] = self.severities[list(self.severities)[0]]
+        #data["# Severity 2"] = self.severities[list(self.severities)[1]]
+        #data["# Severity 3"] = self.severities[list(self.severities)[2]]
+        #data["# Severity 4"] = self.severities[list(self.severities)[3]]
+        #data["Alerts/DstPort"] = self.dst_ports
+        #data["Alerts/SrcPort"] = self.src_ports
+        #data["Alerts/SrcBClassNet"] = self.src_ips
+        #data["Alerts/DstBClassNet"] = self.dst_ips
+        #data["Per SrcPort"] = self.src_ports
+        data["alerts"] = self.alerts
         data["flows"] = self.flows
         data["packets_per_port"] = self.packets_per_port
         data["bytes_per_port"] = self.bytes_per_port
@@ -250,11 +257,10 @@ class Extractor(object):
     def __init__(self, filename=None):
         self.tw_archive = {}
         self.timewindow = None
-        self.line_number = 0
         self.last_timestamp = None
         self.file = filename
 
-    def process_line(self, line, timewindow):
+    def process_line(self, line, timewindow, target_destination_ip):
         """
         Process each line, extract the columns, get the correct TW and store each alert on the TW object
         """
@@ -266,6 +272,10 @@ class Extractor(object):
                 if "alert" not in json_line["event_type"] and "flow" not in json_line["event_type"]:
                     return False
                 # forget the timezone for now with split
+                try:
+                    col_flow_id = json_line["flow_id"]
+                except KeyError:
+                    col_flow_id = ''
                 try:
                     col_time = json_line["timestamp"].split('+')[0]
                 except KeyError:
@@ -301,7 +311,7 @@ class Extractor(object):
 
                 # Get the time window object
                 if 'alert' in json_line["event_type"]:
-                    timewindow.add_alert(col_category, col_severity, col_signature, col_srcip, col_dstip, col_srcport, col_dstport)
+                    timewindow.add_alert(col_category, col_severity, col_signature, col_srcip,col_srcport, col_dstip, col_srcport, col_dstport, col_flow_id)
                 elif 'flow' in json_line["event_type"]:
                     #print("FLOW PROCESSING")
                     try:
@@ -324,22 +334,23 @@ class Extractor(object):
                         col_pkts_toclient = json_line["flow"]["pkts_toclient"]
                     except KeyError:
                         col_pkts_toclient = ''
-                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient)
+                    try:
+                        flow_id = json_line["flow_id"]
+                    except KeyError:
+                        flow_id = ''
+                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient,target_destination_ip, col_flow_id)
             else: #we are out of TimeWindow
                 self.last_timestamp = line_timestamp
                 print("Out of TW")
                 
-    def get_data(self, tw_start, tw_end):
+    def get_data(self, tw_start, tw_end, target_destination_ip):
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
         counter = 0;
-        #print("Starting at line:{}".format(self.line_number))
         print(f"Starting reading of the suricata file :{self.file}")
         with open(self.file) as lines:
             for line in lines: #skip the lines we already inspected
-                #print(line)
-                self.process_line(line,self.timewindow)
+                self.process_line(line,self.timewindow,target_destination_ip)
                 counter+=1
-        self.line_number += counter
         print("################### Number of processed lines:{} , size:{}##########################".format(counter, os.path.getsize(self.file)))
         return self.timewindow.get_data_as_dict()
