@@ -215,11 +215,11 @@ class Extractor(object):
                 self.last_timestamp = line_timestamp
                 print("Out of TW")
                 
-    def get_data(self, tw_start, tw_end, target_destination_ip):
+    def get_data(self, filename, tw_start, tw_end, target_destination_ip):
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
         counter = 0
-        with open(self.file) as lines:
+        with open(filename) as lines:
             for line in lines: #skip the lines we already inspected
                 self.process_line(line,self.timewindow,target_destination_ip)
                 counter+=1

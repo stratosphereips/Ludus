@@ -54,13 +54,13 @@ def colored(text,color):
     CYELLOW = '\033[93m'
     CBLUE = '\033[94m'
 
-    if color == "green":
+    if color.lower() == "green":
         return CGREEN + text + CEND
-    elif color == "red":
+    elif color.lower() == "red":
         return CRED + text + CEND
-    elif color == "yellow":
+    elif color.lower() == "yellow":
         return CYELLOW + text + CEND
-    elif color == "blue":
+    elif color.lower() == "blue":
         return CBLUE + text + CEND
     else:
         return text
@@ -77,7 +77,6 @@ class Sendline():
         self.zmqsocket.send_multipart([self.TOPIC, packed])
     def close(self):
         self.zmqcontext.destroy()
-
 
 def open_honeypot(port, known_honeypots, protocol='tcp'):
     if port in known_honeypots:
@@ -137,39 +136,58 @@ class Ludus(object):
     def __init__(self, config_file='/etc/ludus/ludus.config'):
         self.config_parser = configparser.ConfigParser()
         self.config_file = config_file
-        self.suricata_log = "/root/log/suricata/eve.json"
-        self.suricata_tmp_log = "/root/log/suricata/suricata_log.json"
-        self.suricat_extractor = s_extractor.Extractor(self.suricata_tmp_log)
+        self.suricata_log = None
+        #self.suricata_tmp_log = None
+        self.suricata_extractor = s_extractor.Extractor()
         self.tw_start = None
         self.read_configuration()
         self.next_call = 0
         self.s = Sendline()
         self.suricata_pid = None
+        self.ludus_log = None
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
+        config_parser = configparser.ConfigParser()
         self.config_parser.read(self.config_file)
-        self.strategy_file = self.config_parser.get('strategy', 'filename')
-
-        #self.json_file = self.config_parser.get('output', 'filename')
+        #get strategy file
+        self.strategy_file = os.path.join(self.config_parser.get("strategy", "strategy_dir"),self.config_parser.get("strategy", "filename"))
         try:
-            self.tw_length = self.config_parser.getint('settings', 'timeout')
+            self.tw_length = self.config_parser.getint('settings', 'timeout')*60
         except configparser.NoOptionError:
-            self.tw_length = 60
-            print(colored(f"Option 'timeout' not found! Using DEFAULT value {self.tw_length} insted.", "red"))
+            self.tw_length = 600
+            print(colored(f"Option 'timeout' not found! Using DEFAULT value (10 minutes) insted.", "red"))
         except ValueError:
-            self.tw_length = 60
+            self.tw_length = 600
             print(colored(f"Unsupported value in field 'timeout' (expected int)! Using DEFAULT value {self.tw_length} insted.", "red"))
-        try:
-            self.use_suricata = self.config_parser.getboolean('suricata', 'allow')
-        except ValueError:
-            print("Unsupported value in field 'allow' (expected boolean)! Using DEFAULT value 'False' instead.")
-            self.use_suricata = False
+        #get router ip    
         try:
             self.router_ip = self.config_parser.get('settings', 'router_ip')
         except ValueError:
-            print("Unknown value in field 'router_ip'!")
-            self.router_ip="unknown"
+            print(colored("Unknown value in field 'router_ip'!", "red"))
+        #get ludus logfile path
+        try:
+            self.ludus_log= self.config_parser.get('settings', 'logfile')
+        except (ValueError, configparser.NoOptionError) as e:
+            self.ludus_log = None
+        try:
+            self.suricata_interface = self.config_parser.get('suricata', 'interface')
+        except ValueError:
+            self.suricata_interface = "eth1"
+
+        try:
+            self.suricata_logdir = self.config_parser.get('suricata', 'logdir')
+            self.suricata_log = os.path.join(self.config_parser.get('suricata', 'logdir'), "eve.json")
+        except ValueError:
+            self.suricata_interface = "/var/log/ludus/eve.json"
+            self.suricata_interface = "/var/log/ludus/eve_tmp.json"
+
+        try:
+            self.suricata_config = self.config_parser.get('suricata', 'config')
+        except ValueError:
+            self.suricata_interface = "/etc/ludus/suricata_for_ludus.yaml"
+        
+
 
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore               
@@ -206,12 +224,12 @@ class Ludus(object):
             tmp["bytes_to_client"] = suricata_data["bytes_per_port"][protocol, dport][1]
             used.add((protocol, dport))
             port_info.append(tmp)
-        for x in self.active_honeypots:
-            if x not in used:
-                port_info.append({"status":"honeypot", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
-        for x in self.production_ports:
-            if x not in used:
-                port_info.append({"status":"production", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
+        for protocol, dport in self.active_honeypots:
+            if (protocol, dport) not in used:
+                port_info.append({"port": dport, "protocol":protocol,"status":"honeypot", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
+        for protocol, dport in self.production_ports:
+            if (protocol, dport) not in used:
+                port_info.append({"port": dport, "protocol":protocol,"status":"production", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
 
         flows = []
         for flow_id, data in suricata_data["flows"].items():
@@ -239,11 +257,12 @@ class Ludus(object):
         next_start = self.tw_end
         try:
             #rotate suricata log file
-            os.rename(self.suricata_log, self.suricata_tmp_log)
+            tmp_file = os.path.join(self.suricata_logdir,"tmp.json")
+            os.rename(self.suricata_log, tmp_file)
             os.kill(self.suricata_pid, signal.SIGHUP)
             #get data from Suricata-Extractor
-            suricata_data = self.suricat_extractor.get_data(self.tw_start,self.tw_end,self.router_ip)
-            os.remove(self.suricata_tmp_log)
+            suricata_data = self.suricata_extractor.get_data(tmp_file, self.tw_start,self.tw_end,self.router_ip)
+            os.remove(tmp_file)
         except FileNotFoundError:
             print(colored("Unable to locate the suricata log!","red"))
             self.terminate(status=-1)
@@ -283,8 +302,11 @@ class Ludus(object):
 
     
     def start(self):
+        # read configuration file
+        self.read_configuration()
         # check if suricata event file exist
         subprocess.call(["touch",self.suricata_log])
+
         # check if suricata is up and running
         process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
@@ -296,9 +318,9 @@ class Ludus(object):
             if(len(out) == 0): #no running suricata
                 #TODO CHECK IF suricata.yaml is set up correctly
                 print(colored("Suricata is required for running Ludus. Starting suricata with default configuration.", "red"))
-                suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                self.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
-                if ludus.suricata_pid:
+                suricata_process =  subprocess.Popen(f'suricata -i {self.suricata_interface} -c {self.suricata_config} -l {self.suricata_logdir}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                self.suricata_pid = suricata_process.pid
+                if self.suricata_pid:
                     print(colored("Suricata started", "green"))
                 else:
                     print(colored("Error while starting suricata","red"))
@@ -306,8 +328,6 @@ class Ludus(object):
                     sys.exit(-1)
         #start            
         print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
-        # read configuration file
-        self.read_configuration()
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy

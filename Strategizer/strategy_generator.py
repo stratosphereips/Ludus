@@ -61,6 +61,7 @@ class defender():
         Get the production ports and return the honeyport port according to the probabilities 
         """
         try:
+            print(self.defenders_actions.keys())
             current_honeypot_dict = self.defenders_actions[production_ports]
             # We have it
             sorted_current_honeypot_dict = sorted(current_honeypot_dict.items(), key=operator.itemgetter(1))
@@ -80,7 +81,26 @@ class defender():
             return sorted_current_honeypot_dict[-1][0]
         except KeyError:
             #print production_ports
-            #print 'We never saw that combination of production ports {}. Sorry we can not help you now.'.format(production_ports)
+            print('We never saw that combination of production ports {}. Sorry we can not help you now.'.format(production_ports))
+            print("_________________")
+            candinates = []
+            maxsize = -1
+            for x in self.defenders_actions.keys():
+                h = set([a for a in x.split(",")])
+                p = set([a for a in production_ports.split(",")])
+                if h.issubset(p):
+                    if len(h) > maxsize:
+                        maxsize = len(h)
+                        candinates = [h]
+                        print(h)
+                    elif len(h) == maxsize:
+                        candinates.append(h)
+                        print(h)
+            print(candinates)
+            for x in candinates:
+                print(x,",".join(list(x)))
+                #print(x,self.defenders_actions[",".join(list(x))])
+            #sorted_current_honeypot_dict = sorted(current_honeypot_dict.items(), key=operator.itemgetter(1))
             return None
 
 def read_data(file, NewDefender, debug=0):
@@ -133,7 +153,7 @@ if __name__ == '__main__':
 
     # Read the production port
     if not args.ports:
-        temp_production_ports = raw_input('Input the production ports (comma separated): ')
+        temp_production_ports = input('Input the production ports (comma separated): ')
     else:
         temp_production_ports = args.ports
     try:
@@ -145,7 +165,3 @@ if __name__ == '__main__':
     # Get the honeyport port
     honeypot_port = NewDefender.get_honeypot_ports(production_ports,args.debug)
     print('The honeypot port selected for you is: {}'.format(honeypot_port))
-
-
-
-
