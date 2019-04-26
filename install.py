@@ -57,7 +57,7 @@ config.set("suricata", "logdir", logdir)
 config.write(config_file)
 
 # copy suricata.yaml and update it
-os.system(f"cat /etc/suricata/suricata.yaml | sed -e 's/[^$+#]HOME_NET:.*/HOME_NET: \'{router_ip}\'/' > {os.path.join(config_path, 'suricata_for_ludus.yaml')}")
+os.system(f"cat /etc/suricata/suricata.yaml | sed -e 's/[^$+#]HOME_NET:.*/ HOME_NET: \'{router_ip}\'/' > {os.path.join(config_path, 'suricata_for_ludus.yaml')}")
 
 #copy strategy files to strategy_dir
 os.system(f"cp -a ./Strategizer/strategies {strategy_dir}")
