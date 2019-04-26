@@ -57,10 +57,15 @@ config.set("suricata", "logdir", logdir)
 config.write(config_file)
 
 # copy suricata.yaml and update it
-os.system(f"cat /etc/suricata/suricata.yaml | sed -e 's/[^$+#]HOME_NET:.*/ HOME_NET: \'{router_ip}\'/' > {os.path.join(config_path, 'suricata_for_ludus.yaml')}")
+os.system(f"cat /etc/suricata/suricata.yaml | sed -e 's/[^$+#]HOME_NET:.*/ HOME_NET: \'{router_ip}\'/' | sed -e 's/[^#]default-rule-path:.*/default-rule-path: \'{os.path.join(config_path,'rules')}\'/' > {os.path.join(config_path, 'suricata_for_ludus.yaml')}")
 
 #copy strategy files to strategy_dir
 os.system(f"cp -a ./Strategizer/strategies {strategy_dir}")
+
+#donwload rules for suricata
+os.system("wget https://rules.emergingthreats.net/open/suricata/emerging.rules.tar.gz")
+os.system(f"tar -C {config_path} -xvf emerging.rules.tar.gz")
+os.system("rm emerging.rules.tar.gz")
 
 # register ludus as process
 print(colored("Instalation finished! See README for more information about Ludus", "green"))
