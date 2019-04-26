@@ -41,7 +41,7 @@ config = configparser.ConfigParser()
 #settings
 config.add_section("settings")
 config.set("settings","router_ip", router_ip)
-config.set("settings","timeout", "600")
+config.set("settings","timeout", "10")
 config.set("settings", "logfile", os.path.join(logdir, "stats.log"))
 
 #strategy
