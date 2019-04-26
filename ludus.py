@@ -65,6 +65,11 @@ def colored(text,color):
     else:
         return text
 
+def write_pid_file(pid_file):
+    with open(pid_file, "w+") as fp:
+        pid = str(os.getpid())
+        fp.write(pid)
+
 class Sendline():
     TOPIC=b"sentinel/collect/ludus"
 
@@ -362,11 +367,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
     parser.add_argument('-p', '--volumeter_port', help='Port to listen on to get data from Volumeter', action='store', default=53333, required=False, type=int)
+    parser.add_argument('--pidfile', help='Path to create pid file', action='store', required=False, type=str) #, default='/etc/ludus/ludus.config')
     args = parser.parse_args()
 
     #start the tool
     print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
     print(colored(f"\nVersion {VERSION}\n", "blue"))
+
+    if args.pidfile:
+        write_pid_file(args.pidfile)
 
     ludus = Ludus(args.config)
     try:
