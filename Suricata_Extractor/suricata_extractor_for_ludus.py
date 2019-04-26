@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/python3 -u
 # See the file 'LICENSE' for copying permission.
 # Authors:  Sebastian Garcia. eldraco@gmail.com , sebastian.garcia@agents.fel.cvut.cz
 #           Ondrej Lukas. ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
@@ -88,6 +88,7 @@ class TimeWindow(object):
         TODO:Check if there are any new fields in eve.json
         """
         self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
+
 
     def get_data_as_dict(self):
         data = {}
@@ -214,8 +215,10 @@ class Extractor(object):
             else: #we are out of TimeWindow
                 self.last_timestamp = line_timestamp
                 print("Out of TW")
+
                 
     def get_data(self, filename, tw_start, tw_end, target_destination_ip):
+
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
         counter = 0

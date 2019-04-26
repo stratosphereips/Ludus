@@ -18,7 +18,7 @@
 # This file is part of the Stratosphere Linux IPS project. https://stratosphereips.org
 
 # Author:
-# Ondrej Lukas - ondrej.lukas95@gmail.com , lukasond@fel.cvut.cz 
+# Ondrej Lukas - ondrej.lukas95@gmail.com , lukasond@fel.cvut.cz
 
 
 #TODO:
@@ -111,6 +111,15 @@ def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
     #build the string
     if(len(path_to_strategy) > 0):
+<<<<<<< HEAD
+=======
+        ports_s = ''
+        for item in ports:
+            ports_s += (str(item)+',')
+        #get rid of the last comma
+        ports_s = ports_s[0:-1]
+
+>>>>>>> c46231af7ab41d0ddf71f601d08baf5121c30efa
         #get strategy
         defender = generator.Defender(path_to_strategy)
         suggested_honeypots = defender.get_strategy(ports)
@@ -190,7 +199,7 @@ class Ludus(object):
 
 
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
-        #close previously opened HP which we do not want anymore               
+        #close previously opened HP which we do not want anymore
         try:
             for port in suggested_honeypots:
                 if port not in self.active_honeypots:
@@ -203,7 +212,7 @@ class Ludus(object):
             #open the Honeypots on suggested ports
             for port in suggested_honeypots:
                 if port not in self.active_honeypots:
-                    open_honeypot(port,known_honeypots)   
+                    open_honeypot(port,known_honeypots)
         except TypeError:
             #no action required
             pass
@@ -273,7 +282,7 @@ class Ludus(object):
         self.read_configuration()
 
         #get the information about ports in use
-        (production_ports, active_hp) = get_ports_information()  
+        (production_ports, active_hp) = get_ports_information()
         #do we need to change the defence_strategy?
         if set(production_ports) != set(self.production_ports) or self.strategy_file != old_strategy:
             #update the settings
@@ -282,7 +291,7 @@ class Ludus(object):
             #get strategy
             suggested_honeypots = get_strategy(self.production_ports,active_hp,self.strategy_file)
             self.apply_strategy(suggested_honeypots)
-        
+
         #store the information in the file
         output = self.generate_output(suricata_data)
 
@@ -300,8 +309,9 @@ class Ludus(object):
         print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
 
-    
+
     def start(self):
+<<<<<<< HEAD
         # read configuration file
         self.read_configuration()
         # check if suricata event file exist
@@ -328,6 +338,10 @@ class Ludus(object):
                     sys.exit(-1)
         #start            
         print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
+=======
+        """Main loop"""
+
+>>>>>>> c46231af7ab41d0ddf71f601d08baf5121c30efa
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
@@ -339,7 +353,7 @@ class Ludus(object):
         self.next_call = self.tw_start
         self.scheduler.enter(self.tw_length, 1, self.run)
         self.scheduler.run()
-        
+
         #terminate the connection to DB
         self.terminate()
 
@@ -359,7 +373,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
     parser.add_argument('-p', '--volumeter_port', help='Port to listen on to get data from Volumeter', action='store', default=53333, required=False, type=int)
     args = parser.parse_args()
-    
+
     #start the tool
     print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
     print(colored(f"\nVersion {VERSION}\n", "blue"))
@@ -367,6 +381,7 @@ if __name__ == '__main__':
 
 
     #check if suricata is running
+<<<<<<< HEAD
     #process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     #out, err = process.communicate()
     
@@ -393,3 +408,33 @@ if __name__ == '__main__':
         print(colored("\nLeaving Ludus", "blue"))
         """
         ludus.terminate(-1)
+=======
+    process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    end_flag = threading.Event()
+    ludus = Ludus(args.volumeter_port,end_flag,args.config)
+    if(len(err) > 0): #something wrong with the suricata running test
+        print("Error while testing if suricata is running.")
+    else:
+        try:
+            if(len(out) == 0): #no running suricata
+                print(colored("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.", "red"))
+                suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
+            if ludus.suricata_pid:
+                print(colored("Suricata is running", "green"))
+            #start Volumeter
+            volumeter_process = vol.Volumeter(ludus.router_ip,53333)
+            volumeter_process.start()
+            #read configuration
+            ludus.read_configuration()
+            #everything is set, start ludus
+            print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
+            ludus.start()
+
+        except KeyboardInterrupt:
+            end_flag.set()
+            ludus.s.close()
+            volumeter_process.join()
+            print(colored("\nLeaving Ludus", "blue"))
+>>>>>>> c46231af7ab41d0ddf71f601d08baf5121c30efa
