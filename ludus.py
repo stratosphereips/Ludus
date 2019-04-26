@@ -111,15 +111,6 @@ def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
     #build the string
     if(len(path_to_strategy) > 0):
-<<<<<<< HEAD
-=======
-        ports_s = ''
-        for item in ports:
-            ports_s += (str(item)+',')
-        #get rid of the last comma
-        ports_s = ports_s[0:-1]
-
->>>>>>> c46231af7ab41d0ddf71f601d08baf5121c30efa
         #get strategy
         defender = generator.Defender(path_to_strategy)
         suggested_honeypots = defender.get_strategy(ports)
@@ -311,7 +302,6 @@ class Ludus(object):
 
 
     def start(self):
-<<<<<<< HEAD
         # read configuration file
         self.read_configuration()
         # check if suricata event file exist
@@ -338,10 +328,6 @@ class Ludus(object):
                     sys.exit(-1)
         #start            
         print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
-=======
-        """Main loop"""
-
->>>>>>> c46231af7ab41d0ddf71f601d08baf5121c30efa
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
@@ -378,63 +364,9 @@ if __name__ == '__main__':
     print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
     print(colored(f"\nVersion {VERSION}\n", "blue"))
 
-
-
-    #check if suricata is running
-<<<<<<< HEAD
-    #process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    #out, err = process.communicate()
-    
-    #create ludus object
     ludus = Ludus(args.config)
-    #
-    #if(len(err) > 0): #something wrong with the suricata running test
-    #   print("Error while testing if suricata is running.")
     try:
-        """
-        if(len(out) == 0): #no running suricata
-            print(colored("Suricata is required for running Ludus. Starting suricata with default configuration.", "red"))
-            suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
-        if ludus.suricata_pid:
-            print(colored("Suricata is running", "green"))
-        """
         # start ludus
         ludus.start()
     except KeyboardInterrupt:
-        """
-        ludus.s.close()
-        subprocess.check_output(["kill", str(ludus.suricata_pid)])
-        print(colored("\nLeaving Ludus", "blue"))
-        """
         ludus.terminate(-1)
-=======
-    process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = process.communicate()
-    end_flag = threading.Event()
-    ludus = Ludus(args.volumeter_port,end_flag,args.config)
-    if(len(err) > 0): #something wrong with the suricata running test
-        print("Error while testing if suricata is running.")
-    else:
-        try:
-            if(len(out) == 0): #no running suricata
-                print(colored("Suricata is required for running Ludus. Starting suricata with interface {} and default configuration.", "red"))
-                suricata_process =  subprocess.Popen('suricata -i eth1', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            ludus.suricata_pid = int(subprocess.check_output(["pidof","suricata"]))
-            if ludus.suricata_pid:
-                print(colored("Suricata is running", "green"))
-            #start Volumeter
-            volumeter_process = vol.Volumeter(ludus.router_ip,53333)
-            volumeter_process.start()
-            #read configuration
-            ludus.read_configuration()
-            #everything is set, start ludus
-            print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
-            ludus.start()
-
-        except KeyboardInterrupt:
-            end_flag.set()
-            ludus.s.close()
-            volumeter_process.join()
-            print(colored("\nLeaving Ludus", "blue"))
->>>>>>> c46231af7ab41d0ddf71f601d08baf5121c30efa
