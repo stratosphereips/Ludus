@@ -304,9 +304,13 @@ class Ludus(object):
     def start(self):
         # read configuration file
         self.read_configuration()
+        #create dir for logs
+        try:
+            os.makedirs(self.suricata_logdir)
+        except FileExistsError:
+            pass
         # check if suricata event file exist
         subprocess.call(["touch",self.suricata_log])
-
         # check if suricata is up and running
         process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
