@@ -263,6 +263,7 @@ class Ludus(object):
             #get data from Suricata-Extractor
             suricata_data = self.suricata_extractor.get_data(tmp_file, self.tw_start,self.tw_end,self.router_ip)
             os.remove(tmp_file)
+            os.system("ls -ll /var/log/ludus")
         except FileNotFoundError:
             print(colored("Unable to locate the suricata log!","red"))
             self.terminate(status=-1)
