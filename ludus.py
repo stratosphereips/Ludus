@@ -349,10 +349,8 @@ class Ludus(object):
         #kill suricata
         if self.suricata_pid:
             subprocess.check_output(["kill", str(ludus.suricata_pid)])
-        if status == 0:
-            print(colored("\nLeaving Ludus", "blue"))
-        else:
-            print(colored("\nError, terminating Ludus", "red"))
+        print(colored("\nLeaving Ludus", "blue"))
+            
 
 if __name__ == '__main__':
 
