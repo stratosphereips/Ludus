@@ -22,7 +22,6 @@
 
 
 #TODO:
-#   log
 #   sample config file
 #   changes in suricata.yaml
 #   check if sentinel is running
@@ -43,8 +42,6 @@ import configparser
 from multiprocessing import Process
 VERSION = "0.7"
 
-
-#known_honeypots = ['22', '23', '8080', '2323', '80', '3128', '8123']
 known_honeypots = [22, 23, 8080, 2323, 80, 3128, 8123]
 
 def colored(text,color):
@@ -96,16 +93,17 @@ def close_honeypot(port,known_honeypots, protocol='tcp'):
     if port in known_honeypots:
         #is it ssh
         if port == 22:
+            subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
             #subprocess.Popen('iptables -t nat -D zone_wan_prerouting 1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-            command = '/etc/init.d/haas-proxy stop'
+            #command = '/etc/init.d/haas-proxy stop'
         #no, its one of the minipot
         else:
             #TODO BETTER HANDELING THE RULE NUMBERS
-            command = 'uci del_list ucollect.fakes.disable='+port+protocol
+            subprocess.Popen(f"uci del_list ucollect.fakes.disable={port}{protocol}", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     #no, it is TARPIT
     else:
-        command = 'iptables -D zone_wan_input 6'
-    subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+        #command = 'iptables -D zone_wan_input 6'
+    subprocess.Popen("iptables -D zone_wan_input 6", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
 def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
@@ -124,20 +122,19 @@ def get_ports_information():
     honeypots = []
     for protocol,key in data:
         #get active ports
-        if data[protocol, key] == 'accepted' or data[protocol,key] == 'production':
+        if data[protocol, key] == "accepted" or data[protocol,key] == "production":
             production_ports.append((protocol,key))
         #get honeypots
-        if data[protocol, key] == 'honeypot-turris':
+        if data[protocol, key] == "honeypot-turris":
             honeypots.append((protocol,key))
     return (production_ports, honeypots)
 
 class Ludus(object):
     """Main program for LUDUS project"""
-    def __init__(self, config_file='/etc/ludus/ludus.config'):
+    def __init__(self, config_file="/etc/ludus/ludus.config"):
         self.config_parser = configparser.ConfigParser()
         self.config_file = config_file
         self.suricata_log = None
-        #self.suricata_tmp_log = None
         self.suricata_extractor = s_extractor.Extractor()
         self.tw_start = None
         self.read_configuration()
@@ -153,7 +150,7 @@ class Ludus(object):
         #get strategy file
         self.strategy_file = os.path.join(self.config_parser.get("strategy", "strategy_dir"),self.config_parser.get("strategy", "filename"))
         try:
-            self.tw_length = self.config_parser.getint('settings', 'timeout')*60
+            self.tw_length = self.config_parser.getint("settings", "timeout")*60
         except configparser.NoOptionError:
             self.tw_length = 600
             print(colored(f"Option 'timeout' not found! Using DEFAULT value (10 minutes) insted.", "red"))
@@ -169,7 +166,7 @@ class Ludus(object):
         try:
             self.ludus_log= self.config_parser.get('settings', 'logfile')
         except (ValueError, configparser.NoOptionError) as e:
-            self.ludus_log = None
+            self.ludus_log = "/etc/ludus/ludus.log"
         try:
             self.suricata_interface = self.config_parser.get('suricata', 'interface')
         except ValueError:
@@ -179,8 +176,8 @@ class Ludus(object):
             self.suricata_logdir = self.config_parser.get('suricata', 'logdir')
             self.suricata_log = os.path.join(self.config_parser.get('suricata', 'logdir'), "eve.json")
         except ValueError:
-            self.suricata_interface = "/var/log/ludus/eve.json"
-            self.suricata_interface = "/var/log/ludus/eve_tmp.json"
+            self.suricata_logdir = "/var/log/ludus/"
+            self.suricata_log = "/var/log/ludus/eve.json"
 
         try:
             self.suricata_config = self.config_parser.get('suricata', 'config')
@@ -207,6 +204,10 @@ class Ludus(object):
         except TypeError:
             #no action required
             pass
+
+    def log_event(self, msg):
+        with open(self.ludus_log, "a") as out_file:
+            print(f"[{datetime.datetime.now().strftime('%Y/%M/%D %H:%m:%S.%f')}]\t{msg}", file=out_file)
 
     def generate_output(self,suricata_data):
         port_info = []
@@ -238,18 +239,14 @@ class Ludus(object):
                 data["alert"] = tmp
             else:
                 data["alert"] = False
-                #print(data)
             flows.append(data)
 
         output = {}
         output["tw_start"] = datetime.datetime.fromtimestamp(self.tw_start).isoformat(' ')
         output["tw_end"] = datetime.datetime.fromtimestamp(self.tw_end).isoformat(' ')
         output["port_info"] = port_info
-        #output["honeypots"] = self.active_honeypots
-        #output["production_ports"] = self.production_ports
         output["flows"] = flows
         output["GameStrategyFileName"] = self.strategy_file
-        #output["suricata_data"] = suricata_data
         return output
 
     def run(self):
@@ -263,8 +260,9 @@ class Ludus(object):
             #get data from Suricata-Extractor
             suricata_data = self.suricata_extractor.get_data(tmp_file, self.tw_start,self.tw_end,self.router_ip)
             os.remove(tmp_file)
+
         except FileNotFoundError:
-            print(colored("Unable to locate the suricata log!","red"))
+            self.log_event("Unable to locate the suricata log - Leaving Ludus.")
             self.terminate(status=-1)
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
@@ -289,12 +287,13 @@ class Ludus(object):
         ###########################
         #-------------------------#
         #REMOVE BEFORE PUBLISHING #
-        print(output)             #
+        with open("tmp_log_file.txt", "a") as out_file:
+            print(output, file=out_file)
         #-------------------------#
         ###########################
 
         #send data with Sentinel
-        self.s.sendline(output)
+        #self.s.sendline(output)
 
         self.tw_start = self.tw_end
         print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
@@ -330,8 +329,9 @@ class Ludus(object):
                     print(colored("Error while starting suricata","red"))
                     self.terminate(-1)                    
                     sys.exit(-1)
-        #start            
-        print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
+        #start
+        self.log_event("Ludus system started.")
+        #print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
@@ -353,7 +353,8 @@ class Ludus(object):
         #kill suricata
         if self.suricata_pid:
             subprocess.check_output(["kill", str(ludus.suricata_pid)])
-        print(colored("\nLeaving Ludus", "blue"))
+        self.log_event("Terminating Ludus.")
+        #print(colored("\nLeaving Ludus", "blue"))
             
 
 if __name__ == '__main__':
@@ -365,8 +366,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #start the tool
-    print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
-    print(colored(f"\nVersion {VERSION}\n", "blue"))
+    #print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
+    #print(colored(f"\nVersion {VERSION}\n", "blue"))
 
     ludus = Ludus(args.config)
     try:
