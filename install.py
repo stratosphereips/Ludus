@@ -42,7 +42,7 @@ config = configparser.ConfigParser()
 config.add_section("settings")
 config.set("settings","router_ip", router_ip)
 config.set("settings","timeout", "10")
-config.set("settings", "logfile", os.path.join(logdir, "stats.log"))
+config.set("settings", "logfile", os.path.join(logdir, "ludus.log"))
 
 #strategy
 config.add_section("strategy")
