@@ -66,12 +66,12 @@ class TimeWindow(object):
         self.packets_per_port = {}
         self.bytes_per_port = {}
 
-    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id): 
+    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id, state): 
         #Receive a flow and use it
         if proto in ["tcp", "udp"]:
             if dst_ip in target_destination_ip:
                 #save flow
-                self.flows[flow_id] = {"src_ip":src_ip, "sport": srcport, "dport": dstport, "protcol": proto, "bytes_toclient":bytes_toclient, "bytes_toserver":bytes_toserver, "pkts_toserver":pkts_toserver, "pkts_toclient":pkts_toclient}
+                self.flows[flow_id] = {"src_ip":src_ip, "sport": srcport, "dport": dstport, "protcol": proto, "bytes_toclient":bytes_toclient, "bytes_toserver":bytes_toserver, "pkts_toserver":pkts_toserver, "pkts_toclient":pkts_toclient, "state":state}
                 #save port volumes
                 try:
                     self.packets_per_port[proto, dstport][0] += pkts_toserver
@@ -137,7 +137,11 @@ class Extractor(object):
         """
         Process each line, extract the columns, get the correct TW and store each alert on the TW object
         """
-        json_line = json.loads(line)
+        try:
+            json_line = json.loads(line)
+        except json.decoder.JSONDecodeError:
+            print(json_line)
+            sys.exit()
         #check if we are in the timewindow
         line_timestamp = datetime.strptime(json_line["timestamp"].split('+')[0], timeStampFormat)
         if line_timestamp > timewindow.start or True:
@@ -211,7 +215,11 @@ class Extractor(object):
                         flow_id = json_line["flow_id"]
                     except KeyError:
                         flow_id = ''
-                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient,target_destination_ip, col_flow_id)
+                    try:
+                        state = json_line["flow"]["state"]
+                    except KeyError:
+                        state = ""
+                    timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient,target_destination_ip, col_flow_id, state)
             else: #we are out of TimeWindow
                 self.last_timestamp = line_timestamp
                 print("Out of TW")

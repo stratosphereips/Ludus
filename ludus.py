@@ -22,9 +22,8 @@
 
 
 #TODO:
-#   sample config file
-#   changes in suricata.yaml
-#   check if sentinel is running
+#   changes in suricata.yaml!
+#   check if sentinel is running !
 import time,datetime
 import sys
 import subprocess
@@ -33,7 +32,6 @@ import Strategizer.generator as generator
 import IPTablesAnalyzer.iptables_analyzer
 import zmq
 import msgpack
-import multiprocessing
 import sched
 import os
 import signal
@@ -79,14 +77,17 @@ def open_honeypot(port, known_honeypots, protocol='tcp'):
     if port in known_honeypots:
         #ssh HP
         if port == 22:
-            command = '/etc/init.d/haas-proxy start'
+            #command = '/etc/init.d/haas-proxy start'
+            subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
         #minipot
         else:
-            command = 'uci del_list ucollect.fakes.enable='+port+protocol
+            #command = 'uci del_list ucollect.fakes.enable='+port+protocol
+            subprocess.Popen(f"uci del_list ucollect.fakes.enable={port}{protocol}", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     #no, use TARPIT
     else:
-        command = 'iptables -I zone_wan_input 6 -p tcp --dport %s -j TARPIT' % port
-    subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+        #command = 'iptables -I zone_wan_input 6 -p tcp --dport %s -j TARPIT' % port
+        subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+    #subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
 def close_honeypot(port,known_honeypots, protocol='tcp'):
     #is the port among the known honeypots
@@ -103,7 +104,7 @@ def close_honeypot(port,known_honeypots, protocol='tcp'):
     #no, it is TARPIT
     else:
         #command = 'iptables -D zone_wan_input 6'
-    subprocess.Popen("iptables -D zone_wan_input 6", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+        subprocess.Popen("iptables -D zone_wan_input 6", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
 def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
@@ -115,6 +116,18 @@ def get_strategy(ports, active_honeypots, path_to_strategy):
         return suggested_honeypots
     else: #no strategy file, do nothing
         return []
+
+def valid_ip4(string):
+    try:
+        l = [int(x) for x in string.split(".")]
+        if len(l) != 4:
+            return False
+        for part in l:
+            if part not in range(0,256,1):
+                return False
+        return True
+    except (TypeError,ValueError):
+        return False
 
 def get_ports_information():
     data = IPTablesAnalyzer.iptables_analyzer.get_output()
@@ -131,17 +144,17 @@ def get_ports_information():
 
 class Ludus(object):
     """Main program for LUDUS project"""
-    def __init__(self, config_file="/etc/ludus/ludus.config"):
+    def __init__(self, config_file="/etc/ludus/ludus.config", log_file = "/var/log/ludus/ludus.log"):
         self.config_parser = configparser.ConfigParser()
+        self.ludus_log = log_file
         self.config_file = config_file
         self.suricata_log = None
         self.suricata_extractor = s_extractor.Extractor()
         self.tw_start = None
-        self.read_configuration()
-        self.next_call = 0
         self.s = Sendline()
+        self.next_call = 0
         self.suricata_pid = None
-        self.ludus_log = None
+        self.read_configuration()
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
@@ -153,20 +166,22 @@ class Ludus(object):
             self.tw_length = self.config_parser.getint("settings", "timeout")*60
         except configparser.NoOptionError:
             self.tw_length = 600
-            print(colored(f"Option 'timeout' not found! Using DEFAULT value (10 minutes) insted.", "red"))
         except ValueError:
             self.tw_length = 600
-            print(colored(f"Unsupported value in field 'timeout' (expected int)! Using DEFAULT value {self.tw_length} insted.", "red"))
         #get router ip    
         try:
             self.router_ip = self.config_parser.get('settings', 'router_ip')
+            if not valid_ip4(self.router_ip):
+                self.log_event(f"Error - Unsupported value in field 'router_ip'!, please check '{self.config_file}' and enter valid ipv4 address.")
+                self.terminate(status=-1)
         except ValueError:
-            print(colored("Unknown value in field 'router_ip'!", "red"))
+            self.log_event("Error - Unknown value in field 'router_ip'!")
+            self.terminate(status=-1)
         #get ludus logfile path
         try:
             self.ludus_log= self.config_parser.get('settings', 'logfile')
         except (ValueError, configparser.NoOptionError) as e:
-            self.ludus_log = "/etc/ludus/ludus.log"
+            self.ludus_log = "/var/log/ludus/ludus.log"
         try:
             self.suricata_interface = self.config_parser.get('suricata', 'interface')
         except ValueError:
@@ -184,8 +199,6 @@ class Ludus(object):
         except ValueError:
             self.suricata_interface = "/etc/ludus/suricata_for_ludus.yaml"
         
-
-
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore
         try:
@@ -296,7 +309,7 @@ class Ludus(object):
         #self.s.sendline(output)
 
         self.tw_start = self.tw_end
-        print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
+        #print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
 
 
@@ -310,28 +323,15 @@ class Ludus(object):
             pass
         # check if suricata event file exist
         subprocess.call(["touch",self.suricata_log])
-        # check if suricata is up and running
-        process = subprocess.Popen('pidof suricata', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = process.communicate()
-        if(len(err) > 0): #something wrong with the suricata running test
-            print(colored("Error while testing if suricata is running.","red"))
-            self.terminate(-1)
-            sys.exit(-1)
-        else:
-            if(len(out) == 0): #no running suricata
-                #TODO CHECK IF suricata.yaml is set up correctly
-                print(colored("Suricata is required for running Ludus. Starting suricata with default configuration.", "red"))
-                suricata_process =  subprocess.Popen(f'suricata -i {self.suricata_interface} -c {self.suricata_config} -l {self.suricata_logdir}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                self.suricata_pid = suricata_process.pid
-                if self.suricata_pid:
-                    print(colored("Suricata started", "green"))
-                else:
-                    print(colored("Error while starting suricata","red"))
-                    self.terminate(-1)                    
-                    sys.exit(-1)
+        #start suricata
+        suricata_process =  subprocess.Popen(f'suricata -i {self.suricata_interface} -c {self.suricata_config} -l {self.suricata_logdir}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.suricata_pid = suricata_process.pid
+        if not self.suricata_pid:
+            self.log_event(f"Error while starting suricata: {proc.stderr.read()}")
+            self.terminate(-1)                    
+        
         #start
         self.log_event("Ludus system started.")
-        #print(colored(f"Ludus started on {datetime.datetime.now()}\n", "green"))
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
@@ -345,20 +345,19 @@ class Ludus(object):
         self.scheduler.run()
 
         #terminate the connection to DB
-        self.terminate()
+        self.terminate(0)
 
     def terminate(self,status=0):
         #close sentinel connection
-        self.s.close()
+        if self.s:
+            self.s.close()
         #kill suricata
         if self.suricata_pid:
             subprocess.check_output(["kill", str(ludus.suricata_pid)])
         self.log_event("Terminating Ludus.")
-        #print(colored("\nLeaving Ludus", "blue"))
+        sys.exit(status)
             
-
 if __name__ == '__main__':
-
     # Parse the parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
@@ -366,12 +365,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #start the tool
-    #print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
-    #print(colored(f"\nVersion {VERSION}\n", "blue"))
-
     ludus = Ludus(args.config)
     try:
         # start ludus
         ludus.start()
     except KeyboardInterrupt:
         ludus.terminate(-1)
+    """
+    print(valid_ip4("0.0.0.0"))
+    print(valid_ip4("0.0.0"))
+    print(valid_ip4("272.3.3.1"))
+    print(valid_ip4("a.b.c.1"))
+    print(valid_ip4("-1,43.65.26"))
+    """

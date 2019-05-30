@@ -43,7 +43,7 @@ class Defender():
         if production in self.strategies.keys():
             return self.choose_strategy(self.strategies[production])
         else: #find the nearest neighbour candidates
-            print(f"No precise strategy - finding a closest neighbour for production ports:{production_ports}")
+            #print(f"No precise strategy - finding a closest neighbour for production ports:{production_ports}")
             candidates = []
             size = float("inf")
             for x in self.strategies.keys():
@@ -91,8 +91,3 @@ class Defender():
             filtered_probabilities = sum([prob for (hp_set,prob) in strategy_list if (hp_set,prob) not in hp_list])
             diff = filtered_probabilities/(1 - filtered_probabilities)
             hp_list = [(hp_set,prob+prob*diff) for (hp_set,prob) in hp_list]
-
-if __name__ == '__main__':
-    d = Defender(sys.argv[1])
-    hp = d.get_strategy([80,8000,23])
-    print("SELECTED HONEYPOTS:",hp)

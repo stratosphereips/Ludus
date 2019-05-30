@@ -34,8 +34,8 @@ try:
 	os.makedirs(logdir)
 except:
 	pass
-#get external IP
-router_ip = urllib.request.urlopen('https://ident.me').read().decode('utf8')
+#get external IP using https://ipecho.net/plain service by Google
+router_ip = urllib.request.urlopen('https://ipecho.net/plain').read().decode('utf8')
 config_file= open(os.path.join(config_path,"ludus.config"), "w")
 config = configparser.ConfigParser()
 #settings
