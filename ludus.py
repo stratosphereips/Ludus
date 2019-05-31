@@ -152,7 +152,7 @@ class Ludus(object):
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
-        config_parser = configparser.ConfigParser()
+        config_parser = ConfigParser()
         self.config_parser.read(self.config_file)
         #get strategy file
         self.strategy_file = os.path.join(self.config_parser.get("strategy", "strategy_dir"),self.config_parser.get("strategy", "filename"))
@@ -214,7 +214,7 @@ class Ludus(object):
 
     def log_event(self, msg):
         with open(self.ludus_log, "a") as out_file:
-            print(f"[{datetime.datetime.now().strftime('%Y/%M/%D %H:%m:%S.%f')}]\t{msg}", file=out_file)
+            print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
 
     def generate_output(self,suricata_data):
         port_info = []
