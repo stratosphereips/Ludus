@@ -3,18 +3,11 @@
 # Authors:  Sebastian Garcia. eldraco@gmail.com , sebastian.garcia@agents.fel.cvut.cz
 #           Ondrej Lukas. ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
 
-#TODO:
-# add srcport in flows
 import sys
-import time
-import os
 import json
-import math
 from datetime import datetime
 from datetime import timedelta
-#from os.path import isfile, join
 version = '0.3.2'
-
 
 timewindows = {}
 timeStampFormat = '%Y-%m-%dT%H:%M:%S.%f'
@@ -87,6 +80,7 @@ class TimeWindow(object):
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
         """
+        #print("ALERT:", flow_id, severity, src_ip, category)
         self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
 
 
@@ -97,14 +91,11 @@ class TimeWindow(object):
         data["packets_per_port"] = self.packets_per_port
         data["bytes_per_port"] = self.bytes_per_port
         return data
+
     def __repr__(self):
         return 'TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]])
 
-    def printit(self):
-        pass    
-        #print('TW: {}. #Categories: {}. #Signatures: {}. #SrcIp: {}. #DstIP: {}. #Severities: 1:{}, 2:{}, 3:{}, 4:{}'.format(str(self.start), len(self.categories), len(self.signatures), len(self.src_ips), len(self.dst_ips), self.severities[list(self.severities)[0]], self.severities[list(self.severities)[1]], self.severities[list(self.severities)[2]], self.severities[list(self.severities)[3]]))
-
-def roundTime(dt=None, date_delta=timedelta(minutes=1), to='average'):
+def round_time(dt=None, date_delta=timedelta(minutes=1), to='average'):
     """
     Round a datetime object to a multiple of a timedelta
     dt : datetime.datetime object, default now.
@@ -234,5 +225,4 @@ class Extractor(object):
             for line in lines: #skip the lines we already inspected
                 self.process_line(line,self.timewindow,target_destination_ip)
                 counter+=1
-        #print("################### Number of processed lines:{} , size:{}##########################".format(counter, os.path.getsize(self.file)))
         return self.timewindow.get_data_as_dict()
