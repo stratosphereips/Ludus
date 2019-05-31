@@ -196,8 +196,8 @@ class Ludus(object):
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore
         try:
-            for port in suggested_honeypots:
-                if port not in self.active_honeypots:
+            for port in self.active_honeypots:
+                if port not in suggested_honeypots:
                     close_honeypot(port, known_honeypots)
         except TypeError:
             #no action required
@@ -292,11 +292,9 @@ class Ludus(object):
         output = self.generate_output(suricata_data)
 
         ###########################
-        #-------------------------#
         #REMOVE BEFORE PUBLISHING #
         with open("tmp_log_file.txt", "a") as out_file:
             print(output, file=out_file)
-        #-------------------------#
         ###########################
 
         #send data with Sentinel
