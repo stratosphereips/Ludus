@@ -27,7 +27,6 @@
 import time,datetime
 import sys
 import subprocess
-import argparse
 import Strategizer.generator as generator
 import IPTablesAnalyzer.iptables_analyzer
 import zmq
@@ -36,9 +35,11 @@ import sched
 import os
 import signal
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
-import configparser
 from multiprocessing import Process
-VERSION = "0.7"
+from argparse import ArgumentParser
+from configparser import ConfigParser
+
+VERSION = "0.8"
 
 known_honeypots = [22, 23, 8080, 2323, 80, 3128, 8123]
 
@@ -77,17 +78,13 @@ def open_honeypot(port, known_honeypots, protocol='tcp'):
     if port in known_honeypots:
         #ssh HP
         if port == 22:
-            #command = '/etc/init.d/haas-proxy start'
             subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
         #minipot
         else:
-            #command = 'uci del_list ucollect.fakes.enable='+port+protocol
             subprocess.Popen(f"uci del_list ucollect.fakes.enable={port}{protocol}", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     #no, use TARPIT
     else:
-        #command = 'iptables -I zone_wan_input 6 -p tcp --dport %s -j TARPIT' % port
         subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-    #subprocess.Popen(command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
 def close_honeypot(port,known_honeypots, protocol='tcp'):
     #is the port among the known honeypots
@@ -95,15 +92,12 @@ def close_honeypot(port,known_honeypots, protocol='tcp'):
         #is it ssh
         if port == 22:
             subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-            #subprocess.Popen('iptables -t nat -D zone_wan_prerouting 1', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-            #command = '/etc/init.d/haas-proxy stop'
         #no, its one of the minipot
         else:
             #TODO BETTER HANDELING THE RULE NUMBERS
             subprocess.Popen(f"uci del_list ucollect.fakes.disable={port}{protocol}", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     #no, it is TARPIT
     else:
-        #command = 'iptables -D zone_wan_input 6'
         subprocess.Popen("iptables -D zone_wan_input 6", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
 def get_strategy(ports, active_honeypots, path_to_strategy):
@@ -145,7 +139,7 @@ def get_ports_information():
 class Ludus(object):
     """Main program for LUDUS project"""
     def __init__(self, config_file="/etc/ludus/ludus.config", log_file = "/var/log/ludus/ludus.log"):
-        self.config_parser = configparser.ConfigParser()
+        self.config_parser = ConfigParser()
         self.ludus_log = log_file
         self.config_file = config_file
         self.suricata_log = None
@@ -309,7 +303,6 @@ class Ludus(object):
         #self.s.sendline(output)
 
         self.tw_start = self.tw_end
-        #print(f"------end: {datetime.datetime.fromtimestamp(self.tw_end)}--------")
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
 
 
@@ -359,9 +352,8 @@ class Ludus(object):
             
 if __name__ == '__main__':
     # Parse the parameters
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser()
     parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
-    parser.add_argument('-p', '--volumeter_port', help='Port to listen on to get data from Volumeter', action='store', default=53333, required=False, type=int)
     args = parser.parse_args()
 
     #start the tool
@@ -371,10 +363,3 @@ if __name__ == '__main__':
         ludus.start()
     except KeyboardInterrupt:
         ludus.terminate(-1)
-    """
-    print(valid_ip4("0.0.0.0"))
-    print(valid_ip4("0.0.0"))
-    print(valid_ip4("272.3.3.1"))
-    print(valid_ip4("a.b.c.1"))
-    print(valid_ip4("-1,43.65.26"))
-    """
