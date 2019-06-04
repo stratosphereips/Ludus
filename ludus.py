@@ -356,20 +356,16 @@ class Ludus(object):
 if __name__ == '__main__':
     # Parse the parameters
     parser = ArgumentParser()
-    parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default='/etc/ludus/ludus.config')
+    parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default="/etc/ludus/ludus.config")
     parser.add_argument('--pidfile', help='Path to create pid file', action='store', required=False, type=str) #, default='/etc/ludus/ludus.config')
     args = parser.parse_args()
+    
     if args.pidfile:
         write_pid_file(args.pidfile)
     #start the tool
-    print(colored(".-.   .-..-..--. .-..-..---.\n| |__ | || || \ \| || | \ \ \n`----'`----'`-'-'`----'`---'\n", "blue"))
-    print(colored(f"\nVersion {VERSION}\n", "blue"))
-
-    if args.pidfile:
-        write_pid_file(args.pidfile)
     ludus = Ludus(args.config)
+    
     try:
-        # start ludus
         ludus.start()
     except KeyboardInterrupt:
         ludus.terminate(-1)
