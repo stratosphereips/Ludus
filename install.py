@@ -1,7 +1,24 @@
 import os
 import configparser
 import urllib.request
-from text_colors import colored
+
+def colored(text,color):
+    CRED = '\033[91m'
+    CEND = '\033[0m'
+    CGREEN = '\033[92m'
+    CYELLOW = '\033[93m'
+    CBLUE = '\033[94m'
+
+    if color.lower() == "green":
+        return CGREEN + text + CEND
+    elif color.lower() == "red":
+        return CRED + text + CEND
+    elif color.lower() == "yellow":
+        return CYELLOW + text + CEND
+    elif color.lower() == "blue":
+        return CBLUE + text + CEND
+    else:
+        return text
 
 #update router
 if os.system("opkg update") == 0:
