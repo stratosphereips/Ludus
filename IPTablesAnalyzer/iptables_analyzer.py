@@ -42,8 +42,9 @@ def process_honeypots(verbose=0):
 							#get amount of bytes
 							bytes = rule[1]
 							if rule[9] != '22':
+								print(rule[9])
 								#get info from MANGLE TABLE and add it to the NAT data
-								data = parse_from_line(subprocess.Popen('iptables -vnL -t mangle| grep -w '+ rule[9], shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0])
+								data = parse_from_line(subprocess.Popen('iptables -vnL -t mangle| grep -w '+ rule[9], shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()[0].decode("utf-8"))
 								packets += data[0]
 								bytes += rule[1]
 							#get amount of packets
