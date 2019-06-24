@@ -1,6 +1,10 @@
 import os
 import configparser
 import urllib.request
+import random
+import string
+
+HASH_SIZE = 32
 
 def colored(text,color):
     CRED = '\033[91m'
@@ -29,6 +33,7 @@ if os.system("opkg update") == 0:
 os.system("opkg install python3-msgpack")
 os.system("opkg install python3-zmq")
 os.system("opkg install sentinel-proxy")
+
 #start sentinel
 os.system("/etc/init.d/sentinel-proxy start")
 
@@ -58,8 +63,11 @@ config = configparser.ConfigParser()
 #settings
 config.add_section("settings")
 config.set("settings","router_ip", router_ip)
+config.set("settings","installation_hash", ''.join(random.choices(string.ascii_letters + string.digits, k=HASH_SIZE)))
 config.set("settings","timeout", "10")
 config.set("settings", "logfile", os.path.join(logdir, "ludus.log"))
+config.set("settings","local_stats", "/tmp/ludus_local_data.pkl")
+
 
 #strategy
 config.add_section("strategy")
