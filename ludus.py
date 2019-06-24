@@ -38,6 +38,8 @@ import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
 from multiprocessing import Process
 from argparse import ArgumentParser
 from configparser import ConfigParser
+import pickle
+import json
 
 VERSION = "0.8"
 
@@ -65,6 +67,24 @@ def write_pid_file(pid_file):
     with open(pid_file, "w+") as fp:
         pid = str(os.getpid())
         fp.write(pid)
+
+def store_to_tmp(data, last_tw_start, tmp_file):
+    data_list = []
+    def is_in_24h_tw(t1,t2):
+        td = t2-t1
+        return td.days < 1
+    try:
+        with open(tmp_file,"rb") as f:
+            data_list = pickle.load(f)
+    except FileNotFoundError:
+        data_list = []
+    #print("Before", len(data_list))
+    data_list = [x for x in data_list if is_in_24h_tw(datetime.datetime.strptime(x["tw_start"], "%Y-%m-%d %H:%M:%S.%f"),last_tw_start)]
+    #print("Filtered", len(data_list))
+    data_list.append(data)
+    #print("Appended", len(data_list))
+    with open(tmp_file, "wb") as f:
+        pickle.dump(data_list, f)
 
 class Sendline():
     TOPIC=b"sentinel/collect/ludus"
@@ -259,6 +279,8 @@ class Ludus(object):
         output["port_info"] = port_info
         output["flows"] = flows
         output["GameStrategyFileName"] = self.strategy_file
+
+        #print(output["tw_start"], type(output["tw_start"]), datetime.datetime.strptime(output["tw_start"], "%Y-%m-%d %H:%M:%S.%f"))
         return output
 
     def run(self):
@@ -268,6 +290,9 @@ class Ludus(object):
             #rotate suricata log file
             tmp_file = os.path.join(self.suricata_logdir,"tmp.json")
             os.rename(self.suricata_log, tmp_file)
+            #create the file again
+            open(os.path.join(self.suricata_logdir,"eve.json"), 'a').close()
+            #tell suricata to reopen the eve.json file
             os.kill(self.suricata_pid, signal.SIGHUP)
             #get data from Suricata-Extractor
             suricata_data = self.suricata_extractor.get_data(tmp_file, self.tw_start,self.tw_end,self.router_ip)
@@ -295,15 +320,15 @@ class Ludus(object):
 
         #store the information in the file
         output = self.generate_output(suricata_data)
-
+        store_to_tmp(output, datetime.datetime.fromtimestamp(self.tw_start), "/tmp/ludusTEST.pkl")
         ###########################
         #REMOVE BEFORE PUBLISHING #
-        with open("tmp_log_file.txt", "a") as out_file:
-            print(output, file=out_file)
+        #with open("tmp_log_file.txt", "a") as out_file:
+        #    print(output, file=out_file)
         ###########################
 
         #send data with Sentinel
-        #self.s.sendline(output)
+        self.s.sendline(json.dumps(output))
 
         self.tw_start = self.tw_end
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
