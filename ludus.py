@@ -78,11 +78,8 @@ def store_to_tmp(data, last_tw_start, tmp_file):
             data_list = pickle.load(f)
     except FileNotFoundError:
         data_list = []
-    #print("Before", len(data_list))
     data_list = [x for x in data_list if is_in_24h_tw(datetime.datetime.strptime(x["tw_start"], "%Y-%m-%d %H:%M:%S.%f"),last_tw_start)]
-    #print("Filtered", len(data_list))
     data_list.append(data)
-    #print("Appended", len(data_list))
     with open(tmp_file, "wb") as f:
         pickle.dump(data_list, f)
 
@@ -166,6 +163,7 @@ class Ludus(object):
     def __init__(self, config_file="/etc/ludus/ludus.config", log_file = "/var/log/ludus/ludus.log"):
         self.config_parser = ConfigParser()
         self.ludus_log = log_file
+        self.ludus_local_stats = None
         self.config_file = config_file
         self.suricata_log = None
         self.suricata_extractor = s_extractor.Extractor()
@@ -217,6 +215,15 @@ class Ludus(object):
             self.suricata_config = self.config_parser.get('suricata', 'config')
         except ValueError:
             self.suricata_interface = "/etc/ludus/suricata_for_ludus.yaml"
+
+        try:
+            self.ludus_local_stats = self.config_parser.get("settings", "local_stats")
+        except ValueError:
+            self.ludus_local_stats = "/tmp/ludus_local_data.pkl"
+        try:
+            self.instance_hash = self.config_parser.get("settings","installation_hash")
+        except ValueError:
+            self.instance_hash = "Unknown"
         
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore
@@ -278,6 +285,7 @@ class Ludus(object):
         output["tw_end"] = datetime.datetime.fromtimestamp(self.tw_end).isoformat(' ')
         output["port_info"] = port_info
         output["flows"] = flows
+        output["instance_hash"] = self.instance_hash
         output["GameStrategyFileName"] = self.strategy_file
 
         #print(output["tw_start"], type(output["tw_start"]), datetime.datetime.strptime(output["tw_start"], "%Y-%m-%d %H:%M:%S.%f"))
@@ -320,12 +328,7 @@ class Ludus(object):
 
         #store the information in the file
         output = self.generate_output(suricata_data)
-        store_to_tmp(output, datetime.datetime.fromtimestamp(self.tw_start), "/tmp/ludusTEST.pkl")
-        ###########################
-        #REMOVE BEFORE PUBLISHING #
-        #with open("tmp_log_file.txt", "a") as out_file:
-        #    print(output, file=out_file)
-        ###########################
+        store_to_tmp(output, datetime.datetime.fromtimestamp(self.tw_start), self.ludus_local_stats)
 
         #send data with Sentinel
         self.s.sendline(json.dumps(output))
@@ -393,4 +396,4 @@ if __name__ == '__main__':
     try:
         ludus.start()
     except KeyboardInterrupt:
-        ludus.terminate(-1)
+        ludus.terminate(0)
