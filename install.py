@@ -33,6 +33,7 @@ if os.system("opkg update") == 0:
 os.system("opkg install python3-msgpack")
 os.system("opkg install python3-zmq")
 os.system("opkg install sentinel-proxy")
+os.system("sentinel_certgen certs --renew")
 
 #start sentinel
 os.system("/etc/init.d/sentinel-proxy start")
@@ -92,6 +93,5 @@ os.system(f"tar -C {config_path} -xvf emerging.rules.tar.gz")
 os.system("rm emerging.rules.tar.gz")
 
 # register ludus as process
-print(colored("Instalation finished! See README for more information about Ludus", "green"))
-print("For more information read README file")
+print(colored("Instalation finished! For more information about Ludus project, visit https://www.stratosphereips.org/ludus", "green"))
 #print("For starting the tool, type 'COMMAND TODO'.")
