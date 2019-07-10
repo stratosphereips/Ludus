@@ -287,8 +287,6 @@ class Ludus(object):
         output["flows"] = flows
         output["instance_hash"] = self.instance_hash
         output["GameStrategyFileName"] = self.strategy_file
-
-        #print(output["tw_start"], type(output["tw_start"]), datetime.datetime.strptime(output["tw_start"], "%Y-%m-%d %H:%M:%S.%f"))
         return output
 
     def run(self):
@@ -331,7 +329,7 @@ class Ludus(object):
         store_to_tmp(output, datetime.datetime.fromtimestamp(self.tw_start), self.ludus_local_stats)
 
         #send data with Sentinel
-        self.s.sendline(json.dumps(output))
+        self.s.sendline(output)
 
         self.tw_start = self.tw_end
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
@@ -378,7 +376,10 @@ class Ludus(object):
         #kill suricata
         if self.suricata_pid:
             subprocess.check_output(["kill", str(ludus.suricata_pid)])
-        self.log_event("Terminating Ludus.")
+        if status == 0:
+            self.log_event("Stopping Ludus.")
+        else:
+            self.log_event("Terminating Ludus.")
         sys.exit(status)
             
 if __name__ == '__main__':
@@ -392,7 +393,6 @@ if __name__ == '__main__':
         write_pid_file(args.pidfile)
     #start the tool
     ludus = Ludus(args.config)
-    
     try:
         ludus.start()
     except KeyboardInterrupt:
