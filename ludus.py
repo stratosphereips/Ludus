@@ -99,7 +99,7 @@ class Logger():
     def __init__(self, logfile):
         self.target_file = logfile
 
-    def write_msg(self, msg):
+    def log_event(self, msg):
         with open(self.target_file, "a") as out_file:
             print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
     
@@ -200,18 +200,16 @@ class Ludus(object):
         try:
             self.router_ip = self.config_parser.get('settings', 'router_ip')
             if not valid_ip4(self.router_ip):
-                self.log_event(f"Error - Unsupported value in field 'router_ip'!, please check '{self.config_file}' and enter valid ipv4 address.")
+                self.logger.log_event(f"Error - Unsupported value in field 'router_ip'!, please check '{self.config_file}' and enter valid ipv4 address.")
                 self.terminate(status=-1)
         except ValueError:
-            self.log_event("Error - Unknown value in field 'router_ip'!")
+            self.logger.log_event("Error - Unknown value in field 'router_ip'!")
             self.terminate(status=-1)
         #get ludus logfile path
         try:
-            #self.ludus_log= self.config_parser.get('settings', 'logfile')
             self.logger.update_target_file(self.config_parser.get('settings', 'logfile'))
         except (ValueError, configparser.NoOptionError) as e:
             self.logger.update_target_file("/var/log/ludus/ludus.log")
-            #self.ludus_log = "/var/log/ludus/ludus.log"
         try:
             self.suricata_interface = self.config_parser.get('suricata', 'interface')
         except ValueError:
@@ -256,11 +254,6 @@ class Ludus(object):
         except TypeError:
             #no action required
             pass
-
-    def log_event(self, msg):
-        #with open(self.ludus_log, "a") as out_file:
-        #    print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
-        self.logger.write_msg(msg)
     
     def generate_output(self,suricata_data):
         port_info = []
@@ -322,7 +315,7 @@ class Ludus(object):
             os.remove(tmp_file)
 
         except FileNotFoundError:
-            self.log_event("Unable to locate the suricata log - Leaving Ludus.")
+            self.logger.log_event("Unable to locate the suricata log - Leaving Ludus.")
             self.terminate(status=-1)
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
@@ -366,11 +359,11 @@ class Ludus(object):
         suricata_process =  subprocess.Popen(f'suricata -i {self.suricata_interface} -c {self.suricata_config} -l {self.suricata_logdir}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.suricata_pid = suricata_process.pid
         if not self.suricata_pid:
-            self.log_event(f"Error while starting suricata: {proc.stderr.read()}")
+            self.logger.log_event(f"Error while starting suricata: {proc.stderr.read()}")
             self.terminate(-1)                    
         
         #start
-        self.log_event("Ludus system started.")
+        self.logger.log_event("Ludus system started.")
         #analyze the production ports
         (self.production_ports, self.active_honeypots)=get_ports_information()
         #get strategy
@@ -394,9 +387,9 @@ class Ludus(object):
         if self.suricata_pid:
             subprocess.check_output(["kill", str(ludus.suricata_pid)])
         if status == 0:
-            self.log_event("Stopping Ludus.")
+            self.logger.log_event("Stopping Ludus.")
         else:
-            self.log_event("Terminating Ludus.")
+            self.logger.log_event("Terminating Ludus.")
         sys.exit(status)
             
 if __name__ == '__main__':
