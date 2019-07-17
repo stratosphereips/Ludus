@@ -166,7 +166,7 @@ class Ludus(object):
         self.ludus_local_stats = None
         self.config_file = config_file
         self.suricata_log = None
-        self.suricata_extractor = s_extractor.Extractor()
+        self.suricata_extractor = s_extractor.Extractor(logdir="/var/log/ludus")
         self.tw_start = None
         self.s = Sendline()
         self.next_call = 0
@@ -274,8 +274,11 @@ class Ludus(object):
         flows = []
         for flow_id, data in suricata_data["flows"].items():
             if flow_id in suricata_data["alerts"].keys():
-                tmp = {"severity": suricata_data["alerts"][flow_id]["severity"], "category":suricata_data["alerts"][flow_id]["category"], "signature":suricata_data["alerts"][flow_id]["signature"]}
-                data["alert"] = tmp
+                if data["src_ip"] == suricata_data["alerts"][flow_id]["src_ip"] and data["sport"] == suricata_data["alerts"][flow_id]["sport"]:
+                    tmp = {"severity": suricata_data["alerts"][flow_id]["severity"], "category":suricata_data["alerts"][flow_id]["category"], "signature":suricata_data["alerts"][flow_id]["signature"]}
+                    data["alert"] = tmp
+                else:
+                    data["alert"] = False
             else:
                 data["alert"] = False
             flows.append(data)
