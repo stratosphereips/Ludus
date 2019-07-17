@@ -22,7 +22,6 @@
 
 
 #TODO:
-#   changes in suricata.yaml!
 #   check if sentinel is running !
 import time,datetime
 import sys
@@ -96,6 +95,17 @@ class Sendline():
     def close(self):
         self.zmqcontext.destroy()
 
+class Logger():
+    def __init__(self, logfile):
+        self.target_file = logfile
+
+    def write_msg(self, msg):
+        with open(self.target_file, "a") as out_file:
+            print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
+    
+    def update_target_file(self, filename):
+        self.target_file = filename
+
 def open_honeypot(port, known_honeypots, protocol='tcp'):
     if port in known_honeypots:
         #ssh HP
@@ -162,7 +172,7 @@ class Ludus(object):
     """Main program for LUDUS project"""
     def __init__(self, config_file="/etc/ludus/ludus.config", log_file = "/var/log/ludus/ludus.log"):
         self.config_parser = ConfigParser()
-        self.ludus_log = log_file
+        self.logger = Logger(log_file)
         self.ludus_local_stats = None
         self.config_file = config_file
         self.suricata_log = None
@@ -172,6 +182,7 @@ class Ludus(object):
         self.next_call = 0
         self.suricata_pid = None
         self.read_configuration()
+        self.logger = Logger(log_file)
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
@@ -196,9 +207,11 @@ class Ludus(object):
             self.terminate(status=-1)
         #get ludus logfile path
         try:
-            self.ludus_log= self.config_parser.get('settings', 'logfile')
+            #self.ludus_log= self.config_parser.get('settings', 'logfile')
+            self.logger.update_target_file(self.config_parser.get('settings', 'logfile'))
         except (ValueError, configparser.NoOptionError) as e:
-            self.ludus_log = "/var/log/ludus/ludus.log"
+            self.logger.update_target_file("/var/log/ludus/ludus.log")
+            #self.ludus_log = "/var/log/ludus/ludus.log"
         try:
             self.suricata_interface = self.config_parser.get('suricata', 'interface')
         except ValueError:
@@ -245,9 +258,10 @@ class Ludus(object):
             pass
 
     def log_event(self, msg):
-        with open(self.ludus_log, "a") as out_file:
-            print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
-
+        #with open(self.ludus_log, "a") as out_file:
+        #    print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
+        self.logger.write_msg(msg)
+    
     def generate_output(self,suricata_data):
         port_info = []
         used = set()
