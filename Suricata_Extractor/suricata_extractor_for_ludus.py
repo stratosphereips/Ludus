@@ -81,7 +81,6 @@ class TimeWindow(object):
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
         """
-        #print("ALERT:", flow_id, severity, src_ip, category)
         self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
 
 
@@ -221,14 +220,6 @@ class Extractor(object):
             for line in lines: #skip the lines we already inspected
                 self.process_line(line,self.timewindow,target_destination_ip)
                 counter+=1
+        
         #Check that the alert count is ok
-        with open(self.alert_file) as fast:
-            alert_count = 0
-            for line in fast:
-                data = [x for x in line.split(" ") if len(x) > 0]
-                if data[-1].split(":")[0] == target_destination_ip:
-                    alert_count += 1
-            if alert_count != len(self.timewindow.alerts):
-                with open("/var/log/ludus/ludus.log", "a") as out_file:
-                    print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\tAlert checksum is incorrect!", file=out_file)
         return self.timewindow.get_data_as_dict()
