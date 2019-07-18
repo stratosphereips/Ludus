@@ -76,13 +76,16 @@ class TimeWindow(object):
                     self.packets_per_port[proto, dstport] = [pkts_toserver, pkts_toclient]
                     self.bytes_per_port[proto, dstport] = [bytes_toserver, bytes_toclient]
 
-    def add_alert(self, category, severity, signature, src_ip,src_port, dst_ip, srcport, destport,flow_id):
+    def add_alert(self, category, severity, signature, src_ip,src_port, dst_ip, srcport, destport, flow_id):
         """
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
         """
-        self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
-
+        #self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
+        try:
+            self.alerts[flow_id].append({"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category})
+        except KeyError:
+            self.alerts[flow_id] = [{"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}]
 
     def get_data_as_dict(self):
         data = {}
@@ -122,8 +125,8 @@ class Extractor(object):
         self.tw_archive = {}
         self.timewindow = None
         self.last_timestamp = None
-        self.json_file = os.paths.join(logdir, json_file)
-        self.alert_file = os.paths.join(logdir, alert_file)
+        self.json_file = os.path.join(logdir, json_file)
+        self.alert_file = os.path.join(logdir, alert_file)
 
     def process_line(self, line, timewindow, target_destination_ip):
         """
@@ -211,12 +214,12 @@ class Extractor(object):
     
 
                 
-    def get_data(self, tw_start, tw_end, target_destination_ip):
+    def get_data(self, tmp_file, tw_start, tw_end, target_destination_ip):
 
         self.timewindow = TimeWindow(tw_start,tw_end)
         #Check if there is a better way of iterate through file
         counter = 0
-        with open(self.json_file) as lines:
+        with open(tmp_file) as lines:
             for line in lines: #skip the lines we already inspected
                 self.process_line(line,self.timewindow,target_destination_ip)
                 counter+=1
