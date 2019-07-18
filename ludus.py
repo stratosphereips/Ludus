@@ -36,7 +36,7 @@ import signal
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
 from multiprocessing import Process
 from argparse import ArgumentParser
-from configparser import ConfigParser
+from configparser import ConfigParser,NoOptionError
 import pickle
 import json
 
@@ -186,7 +186,6 @@ class Ludus(object):
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
-        config_parser = ConfigParser()
         self.config_parser.read(self.config_file)
         #get strategy file
         self.strategy_file = os.path.join(self.config_parser.get("strategy", "strategy_dir"),self.config_parser.get("strategy", "filename"))
@@ -208,7 +207,7 @@ class Ludus(object):
         #get ludus logfile path
         try:
             self.logger.update_target_file(self.config_parser.get('settings', 'logfile'))
-        except (ValueError, configparser.NoOptionError) as e:
+        except (ValueError, NoOptionError) as e:
             self.logger.update_target_file("/var/log/ludus/ludus.log")
         try:
             self.suricata_interface = self.config_parser.get('suricata', 'interface')
@@ -277,7 +276,7 @@ class Ludus(object):
         for protocol, dport in self.production_ports:
             if (protocol, dport) not in used:
                 port_info.append({"port": dport, "protocol":protocol,"status":"production", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
-
+        """
         flows = []
         for flow_id, data in suricata_data["flows"].items():
             if flow_id in suricata_data["alerts"].keys():
@@ -289,6 +288,16 @@ class Ludus(object):
             else:
                 data["alert"] = False
             flows.append(data)
+        """
+        flows = []
+        for flow_id, data in suricata_data["flows"].items():
+            data["alert"] = []
+            if flow_id in suricata_data["alerts"].keys():
+                for alert in suricata_data["alerts"][flow_id]:
+                    tmp = {"severity": alert["severity"], "category":alert["category"], "signature":alert["signature"]}
+                    data["alert"].append(tmp)
+            flows.append(data)
+
 
         output = {}
         output["tw_start"] = datetime.datetime.fromtimestamp(self.tw_start).isoformat(' ')
@@ -311,7 +320,7 @@ class Ludus(object):
             #tell suricata to reopen the eve.json file
             os.kill(self.suricata_pid, signal.SIGHUP)
             #get data from Suricata-Extractor
-            suricata_data = self.suricata_extractor.get_data(tmp_file, self.tw_start,self.tw_end,self.router_ip)
+            suricata_data = self.suricata_extractor.get_data(tmp_file, self.tw_start, self.tw_end, self.router_ip)
             os.remove(tmp_file)
 
         except FileNotFoundError:
@@ -337,7 +346,7 @@ class Ludus(object):
         #store the information in the file
         output = self.generate_output(suricata_data)
         store_to_tmp(output, datetime.datetime.fromtimestamp(self.tw_start), self.ludus_local_stats)
-
+        #print(output)
         #send data with Sentinel
         self.s.sendline(output)
 
