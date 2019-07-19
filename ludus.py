@@ -44,24 +44,6 @@ VERSION = "0.8"
 
 known_honeypots = [22, 23, 8080, 2323, 80, 3128, 8123]
 
-def colored(text,color):
-    CRED = '\033[91m'
-    CEND = '\033[0m'
-    CGREEN = '\033[92m'
-    CYELLOW = '\033[93m'
-    CBLUE = '\033[94m'
-
-    if color.lower() == "green":
-        return CGREEN + text + CEND
-    elif color.lower() == "red":
-        return CRED + text + CEND
-    elif color.lower() == "yellow":
-        return CYELLOW + text + CEND
-    elif color.lower() == "blue":
-        return CBLUE + text + CEND
-    else:
-        return text
-
 def write_pid_file(pid_file):
     with open(pid_file, "w+") as fp:
         pid = str(os.getpid())
@@ -145,7 +127,7 @@ def close_honeypot(port,known_honeypots, protocol='tcp'):
 def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
     #build the string
-    if(len(path_to_strategy) > 0):
+    if len(path_to_strategy) > 0:
         #get strategy
         defender = generator.Defender(path_to_strategy)
         suggested_honeypots = defender.get_strategy(ports)
@@ -315,7 +297,7 @@ class Ludus(object):
         output["port_info"] = port_info
         output["flows"] = flows
         output["instance_hash"] = self.instance_hash
-        output["GameStrategyFileName"] = self.strategy_file
+        output["GameStrategyFileName"] = self.strategy_file.split("/")[-1]
         return output
 
     def run(self):
@@ -356,7 +338,6 @@ class Ludus(object):
         #store the information in the file
         output = self.generate_output(suricata_data)
         store_to_tmp(output, datetime.datetime.fromtimestamp(self.tw_start), self.ludus_local_stats)
-        #print(output)
         #send data with Sentinel
         self.s.sendline(output)
 
