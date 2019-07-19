@@ -107,6 +107,7 @@ class Logger():
         self.target_file = filename
 
 def open_honeypot(port, known_honeypots, protocol='tcp'):
+    """
     if port in known_honeypots:
         #ssh HP
         if port == 22:
@@ -117,9 +118,14 @@ def open_honeypot(port, known_honeypots, protocol='tcp'):
     #no, use TARPIT
     else:
         subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-
+    """
+    if port == 22 and protocol == tcp:
+        subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+    else:
+        subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 def close_honeypot(port,known_honeypots, protocol='tcp'):
     #is the port among the known honeypots
+    """
     if port in known_honeypots:
         #is it ssh
         if port == 22:
@@ -131,7 +137,11 @@ def close_honeypot(port,known_honeypots, protocol='tcp'):
     #no, it is TARPIT
     else:
         subprocess.Popen("iptables -D zone_wan_input 6", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-
+    """
+    if port == 22 and protocol == tcp:
+        subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+    else:
+        subprocess.Popen(f"iptables -D zone_wan_input -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
     #build the string
