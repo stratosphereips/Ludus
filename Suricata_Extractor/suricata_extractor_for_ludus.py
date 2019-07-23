@@ -81,7 +81,6 @@ class TimeWindow(object):
         Receive an alert and it adds it to the TW
         TODO:Check if there are any new fields in eve.json
         """
-        #self.alerts[flow_id] = {"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category}
         try:
             self.alerts[flow_id].append({"src_ip":src_ip, "dst_ip": dst_ip, "sport":src_port, "dport": destport, "signature":signature, "severity":severity,"category":category})
         except KeyError:
@@ -211,8 +210,6 @@ class Extractor(object):
             except KeyError:
                 state = ""
             timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient,target_destination_ip, col_flow_id, state)
-    
-
                 
     def get_data(self, tmp_file, tw_start, tw_end, target_destination_ip):
 

@@ -43,7 +43,6 @@ class Defender():
         if production in self.strategies.keys():
             return self.choose_strategy(self.strategies[production])
         else: #find the nearest neighbour candidates
-            #print(f"No precise strategy - finding a closest neighbour for production ports:{production_ports}")
             candidates = []
             size = float("inf")
             for x in self.strategies.keys():

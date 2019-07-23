@@ -1,4 +1,4 @@
-	#!/usr/bin/python
+#!/usr/bin/python3
 #Author: Ondrej Lukas - ondrej.lukas95@gmail.com, lukasond@fel.cvut.cz
 import subprocess
 import re
@@ -56,11 +56,9 @@ def process_honeypots(verbose=0):
 							hp_ports.append((rule[9], rule[3]))
 	
 	#check if there are any TARPIT honeypots
-	#chains = subprocess.Popen('iptables -vnL -t filter', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 	result = subprocess.run(['iptables','-vnL','-t','filter'], stdout=subprocess.PIPE)
 	stdout = result.stdout.decode('utf-8')
 	input_list = stdout.split("Chain")
-	#input_list = chains[0].split("Chain")
 	for item in input_list:
 		parsed = parse_chain(item)
 		if parsed:
@@ -71,8 +69,6 @@ def process_honeypots(verbose=0):
 							print("\tPORT: {}, TARPIT, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[9], rule[3], rule[0],rule[1]))
 						hp_ports.append((rule[9], rule[3]))
 	#check if haas is active
-	#chains = subprocess.Popen('iptables -vnL -t nat | grep DNAT', shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-	result = subprocess.run('iptables -vnL -t nat | grep DNAT', stdout=subprocess.PIPE,shell=True)
 	stdout = result.stdout.decode('utf-8')
 	rules = parse_DNAT_chain(stdout)
 	if rules: #check if there exists at elast one rule
