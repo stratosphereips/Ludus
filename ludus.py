@@ -89,37 +89,11 @@ class Logger():
         self.target_file = filename
 
 def open_honeypot(port, known_honeypots, protocol='tcp'):
-    """
-    if port in known_honeypots:
-        #ssh HP
-        if port == 22:
-            subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-        #minipot
-        else:
-            subprocess.Popen(f"uci del_list ucollect.fakes.enable={port}{protocol}", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-    #no, use TARPIT
-    else:
-        subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-    """
     if port == 22 and protocol == tcp:
         subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
         subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 def close_honeypot(port,known_honeypots, protocol='tcp'):
-    #is the port among the known honeypots
-    """
-    if port in known_honeypots:
-        #is it ssh
-        if port == 22:
-            subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-        #no, its one of the minipot
-        else:
-            #TODO BETTER HANDELING THE RULE NUMBERS
-            subprocess.Popen(f"uci del_list ucollect.fakes.disable={port}{protocol}", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-    #no, it is TARPIT
-    else:
-        subprocess.Popen("iptables -D zone_wan_input 6", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-    """
     if port == 22 and protocol == tcp:
         subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
@@ -245,7 +219,8 @@ class Ludus(object):
         except TypeError:
             #no action required
             pass
-    
+        self.logger.log_event(f"Opening honeypots in ports: {suggested_honeypots}")
+
     def generate_output(self,suricata_data):
         port_info = []
         used = set()
@@ -268,19 +243,6 @@ class Ludus(object):
         for protocol, dport in self.production_ports:
             if (protocol, dport) not in used:
                 port_info.append({"port": dport, "protocol":protocol,"status":"production", "pkts_toserver":0, "pkts_toclient":0, "bytes_to_server":0, "bytes_to_client":0})
-        """
-        flows = []
-        for flow_id, data in suricata_data["flows"].items():
-            if flow_id in suricata_data["alerts"].keys():
-                if data["src_ip"] == suricata_data["alerts"][flow_id]["src_ip"] and data["sport"] == suricata_data["alerts"][flow_id]["sport"]:
-                    tmp = {"severity": suricata_data["alerts"][flow_id]["severity"], "category":suricata_data["alerts"][flow_id]["category"], "signature":suricata_data["alerts"][flow_id]["signature"]}
-                    data["alert"] = tmp
-                else:
-                    data["alert"] = False
-            else:
-                data["alert"] = False
-            flows.append(data)
-        """
         flows = []
         for flow_id, data in suricata_data["flows"].items():
             data["alert"] = []
@@ -289,7 +251,6 @@ class Ludus(object):
                     tmp = {"severity": alert["severity"], "category":alert["category"], "signature":alert["signature"]}
                     data["alert"].append(tmp)
             flows.append(data)
-
 
         output = {}
         output["tw_start"] = datetime.datetime.fromtimestamp(self.tw_start).isoformat(' ')
