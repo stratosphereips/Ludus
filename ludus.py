@@ -14,11 +14,10 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-#
-# This file is part of the Stratosphere Linux IPS project. https://stratosphereips.org
 
 # Author:
 # Ondrej Lukas - ondrej.lukas95@gmail.com , lukasond@fel.cvut.cz
+# Project webpage: https://www.stratosphereips.org/ludus
 
 
 #TODO:
@@ -40,7 +39,7 @@ from configparser import ConfigParser,NoOptionError
 import pickle
 import json
 
-VERSION = "0.8"
+VERSION = "0.9"
 
 known_honeypots = [22, 23, 8080, 2323, 80, 3128, 8123]
 
@@ -79,19 +78,21 @@ class Sendline():
 
 class Logger():
     def __init__(self, logfile):
-        self.target_file = logfile
+        self._target_file = logfile
 
     def log_event(self, msg):
         with open(self.target_file, "a") as out_file:
             print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
     
     def update_target_file(self, filename):
-        self.target_file = filename
+        self._target_file = filename
+
 def open_honeypot(port, protocol, known_honeypots):
     if port == 22 and protocol == "tcp":
         subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
         subprocess.Popen(f"iptables -I zone_wan_input 1 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+
 def close_honeypot(port, protocol, known_honeypots):
     if port == 22 and protocol == "tcp":
         subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
@@ -305,7 +306,6 @@ class Ludus(object):
         self.tw_start = self.tw_end
         self.scheduler.enter((self.next_call +self.tw_length) - time.time(),1,self.run)
 
-
     def start(self):
         # read configuration file
         self.read_configuration()
@@ -357,7 +357,7 @@ if __name__ == '__main__':
     # Parse the parameters
     parser = ArgumentParser()
     parser.add_argument('-c', '--config', help='Path to config file', action='store', required=False, type=str, default="/etc/ludus/ludus.config")
-    parser.add_argument('--pidfile', help='Path to create pid file', action='store', required=False, type=str) #, default='/etc/ludus/ludus.config')
+    parser.add_argument('--pidfile', help='Path to create pid file', action='store', required=False, type=str)
     args = parser.parse_args()
     
     if args.pidfile:
