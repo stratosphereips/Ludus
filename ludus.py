@@ -87,17 +87,17 @@ class Logger():
     
     def update_target_file(self, filename):
         self.target_file = filename
-
-def open_honeypot(port, known_honeypots, protocol='tcp'):
-    if port == 22 and protocol == tcp:
+def open_honeypot(port, protocol, known_honeypots):
+    if port == 22 and protocol == "tcp":
         subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
-        subprocess.Popen(f"iptables -I zone_wan_input 6 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
-def close_honeypot(port,known_honeypots, protocol='tcp'):
-    if port == 22 and protocol == tcp:
+        subprocess.Popen(f"iptables -I zone_wan_input 1 -p {protocol} --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+def close_honeypot(port, protocol, known_honeypots):
+    if port == 22 and protocol == "tcp":
         subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
-        subprocess.Popen(f"iptables -D zone_wan_input -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+        subprocess.Popen(f"iptables -D zone_wan_input -p {protocol} --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+
 def get_strategy(ports, active_honeypots, path_to_strategy):
     """Prepares the string in the format required in strategy generator and return the strategy"""
     #build the string
@@ -206,7 +206,7 @@ class Ludus(object):
         try:
             for port in self.active_honeypots:
                 if port not in suggested_honeypots:
-                    close_honeypot(port, known_honeypots)
+                    close_honeypot(port[1],port[0], known_honeypots)
         except TypeError:
             #no action required
             pass
@@ -215,7 +215,7 @@ class Ludus(object):
             #open the Honeypots on suggested ports
             for port in suggested_honeypots:
                 if port not in self.active_honeypots:
-                    open_honeypot(port,known_honeypots)
+                    open_honeypot(port[1],port[0],known_honeypots)
         except TypeError:
             #no action required
             pass
