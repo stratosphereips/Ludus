@@ -77,7 +77,7 @@ class Defender():
         for i in range(len(hp_list)):
             sum_p += hp_list[i][1]
             if roll <= sum_p:
-                return hp_list[i][0]
+                return return [("tcp", x) for x in hp_list[i][0]]
         return None 
 
 
