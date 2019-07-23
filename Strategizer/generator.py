@@ -39,7 +39,7 @@ class Defender():
             self.strategies[k] = sorted(v,key=lambda x:x[1], reverse=True)
 
     def get_strategy(self, production_ports):
-        production = frozenset(production_ports)
+        production = frozenset([x[1] for x in production_ports if x[0] == "tcp"])
         if production in self.strategies.keys():
             return self.choose_strategy(self.strategies[production])
         else: #find the nearest neighbour candidates
