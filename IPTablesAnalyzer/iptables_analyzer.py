@@ -71,7 +71,6 @@ def process_honeypots(verbose=0):
 	#check if haas is active
 	result = subprocess.run('iptables -vnL -t nat | grep DNAT', stdout=subprocess.PIPE,shell=True)
 	stdout = result.stdout.decode('utf-8')
-	print(stdout)
 	rules = parse_DNAT_chain(stdout)
 	if rules: #check if there exists at elast one rule
 		for rule in rules:
