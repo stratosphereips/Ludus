@@ -60,12 +60,12 @@ class TimeWindow(object):
         self.packets_per_port = {}
         self.bytes_per_port = {}
 
-    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id, state): 
+    def add_flow(self, src_ip, dst_ip, srcport, dstport, proto, bytes_toserver, bytes_toclient, pkts_toserver, pkts_toclient, target_destination_ip, flow_id, state,timestamp): 
         #Receive a flow and use it
         if proto in ["tcp", "udp"]:
             if dst_ip in target_destination_ip:
                 #save flow
-                self.flows[flow_id] = {"src_ip":src_ip, "sport": srcport, "dport": dstport, "protcol": proto, "bytes_toclient":bytes_toclient, "bytes_toserver":bytes_toserver, "pkts_toserver":pkts_toserver, "pkts_toclient":pkts_toclient, "state":state}
+                self.flows[flow_id] = {"src_ip":src_ip, "sport": srcport, "dport": dstport, "protcol": proto, "bytes_toclient":bytes_toclient, "bytes_toserver":bytes_toserver, "pkts_toserver":pkts_toserver, "pkts_toclient":pkts_toclient, "state":state, "flow_timestamp":timestamp}
                 #save port volumes
                 try:
                     self.packets_per_port[proto, dstport][0] += pkts_toserver
@@ -208,7 +208,7 @@ class Extractor(object):
                 state = json_line["flow"]["state"]
             except KeyError:
                 state = ""
-            timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient,target_destination_ip, col_flow_id, state)
+            timewindow.add_flow(col_srcip, col_dstip, col_srcport, col_dstport, col_proto, col_bytes_toserver, col_bytes_toclient, col_pkts_toserver, col_pkts_toclient,target_destination_ip, col_flow_id, state, col_time)
                 
     def get_data(self, tmp_file, tw_start, tw_end, target_destination_ip):
 
