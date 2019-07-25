@@ -134,7 +134,6 @@ class Extractor(object):
         try:
             json_line = json.loads(line)
         except json.decoder.JSONDecodeError:
-            print(json_line)
             sys.exit()
         if "alert" not in json_line["event_type"] and "flow" not in json_line["event_type"]:
             return False
