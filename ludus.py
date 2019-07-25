@@ -81,7 +81,7 @@ class Logger():
         self._target_file = logfile
 
     def log_event(self, msg):
-        with open(self.target_file, "a") as out_file:
+        with open(self._target_file, "a") as out_file:
             print(f"[{datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S.%f')}]\t{msg}", file=out_file)
     
     def update_target_file(self, filename):
