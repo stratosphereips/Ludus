@@ -72,11 +72,11 @@ def process_honeypots(verbose=0):
 	result = subprocess.run('iptables -vnL -t nat | grep DNAT', stdout=subprocess.PIPE,shell=True)
 	stdout = result.stdout.decode('utf-8')
 	rules = parse_DNAT_chain(stdout)
-	if rules: #check if there exists at elast one rule
+	if rules: #check if there exists at least one rule
 		for rule in rules:
-			if  "haas" in rule:
+			if any(keyword in rule for keyword in ["haas", "sentinel"]):
 				if verbose > 0:
-					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1]))
+					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[-1].split(":")[-1], rule[3], rule[0], rule[1]))
 				hp_ports.append((rule[10], rule[3]))
 	return hp_ports						
 
@@ -135,9 +135,10 @@ def process_production_ports(verbose=1):
 	rules = parse_DNAT_chain(stdout)
 	if rules: #check if there exists at elast one rule
 		for rule in rules:
-			if not "haas" in rule:
+			if not any(keyword in rule for keyword in ["haas", "sentinel"]):
 				if verbose > 0:
-					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[11], rule[3], rule[0], rule[1]))
+					print("\tPORT: {}, REDIRECTED TO: {}, PROTOCOL: {} (pkts: {}, bytes: {})".format(rule[10], rule[-1].split(":")[-1], rule[3], rule[0], rule[1]))
+					#print(rule)
 				production_ports.append((rule[10], rule[3]))
 	return production_ports
 	
@@ -217,8 +218,3 @@ if __name__ == '__main__':
 	#get data from accepted ports
 	for port in process_accepted_ports(args.verbose):
 		output[port] = 'accepted'
-	with open(args.folder+args.filename+'.json', 'w') as outfile:
-		#json.dump(output, outfile)
-		pass
-	if args.verbose > 1:
-		print("Results stored in '{}'.".format(args.folder+args.filename+'.json'))
