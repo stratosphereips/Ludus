@@ -90,12 +90,16 @@ class Logger():
 def open_honeypot(port, protocol, known_honeypots):
     if port == 22 and protocol == "tcp":
         subprocess.Popen("/etc/init.d/haas-proxy start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+    elif port == 23 and protocol == "tcp":
+        subprocess.Popen("/etc/init.d/sentinel-minipot start", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
         subprocess.Popen(f"iptables -I zone_wan_input 1 -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
 def close_honeypot(port, protocol, known_honeypots):
     if port == 22 and protocol == "tcp":
         subprocess.Popen("/etc/init.d/haas-proxy stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
+    elif port == 23 and protocol == "tcp":
+        subprocess.Popen("/etc/init.d/sentinel-minipot stop", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
     else:
         subprocess.Popen(f"iptables -D zone_wan_input -p tcp --dport {port} -j TARPIT", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE).communicate()
 
