@@ -209,8 +209,9 @@ class Ludus(object):
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore
         try:
+            self.logger.log_event(f"ACTIVE:{self.active_honeypots}, SUGGESTED:{suggested_honeypots}")
             for port in self.active_honeypots:
-                if port not in suggested_honeypots:
+                if not suggested_honeypots or port not in suggested_honeypots:
                     close_honeypot(port[1],port[0], known_honeypots)
         except TypeError:
             #no action required
@@ -219,7 +220,7 @@ class Ludus(object):
         try:
             #open the Honeypots on suggested ports
             for port in suggested_honeypots:
-                if port not in self.active_honeypots:
+                if not self.active_honeypot or port not in self.active_honeypots:
                     open_honeypot(port[1],port[0],known_honeypots)
         except TypeError:
             #no action required
