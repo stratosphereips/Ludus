@@ -41,7 +41,7 @@ import json
 
 VERSION = "0.9"
 
-known_honeypots = [22, 23, 8080, 2323, 80, 3128, 8123]
+known_honeypots = [("tcp",22), ("tcp",23)]
 
 def write_pid_file(pid_file):
     with open(pid_file, "w+") as fp:
