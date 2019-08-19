@@ -218,3 +218,4 @@ if __name__ == '__main__':
 	#get data from accepted ports
 	for port in process_accepted_ports(args.verbose):
 		output[port] = 'accepted'
+	print(output)
