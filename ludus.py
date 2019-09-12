@@ -269,7 +269,7 @@ class Ludus(object):
         try:
             self.strategy_url = self.config_parser.get("strategy","strategy_url")
         except (ValueError, NoOptionError) as e:
-            self.strategy_url = "http://147.32.80.119:443/newest.gpg"
+            self.strategy_url = "http://ludus.aic.fel.cvut.cz/newest.gpg"
         
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore

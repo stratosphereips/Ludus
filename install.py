@@ -74,6 +74,7 @@ config.set("settings","local_stats", "/tmp/ludus_local_data.pkl")
 config.add_section("strategy")
 config.set("strategy", "strategy_dir", strategy_dir)
 config.set("strategy", "filename", "secConfDefAtt_1516886661989_-1HPsalgzerosum-bayes-relevant-NE-partial-att-strategy_Ports25")
+config.set("strategy", "strategy_url", "http://ludus.aic.fel.cvut.cz/newest.gpg")
 
 #suricata
 config.add_section("suricata")
