@@ -92,6 +92,8 @@ os.system("wget https://rules.emergingthreats.net/open/suricata/emerging.rules.t
 os.system(f"tar -C {config_path} -xvf emerging.rules.tar.gz")
 os.system("rm emerging.rules.tar.gz")
 
+os.system(f"cp ludus-public-key.asc {config_path}")
+
 # register ludus as process
 print(colored("Instalation finished! For more information about Ludus project, visit https://www.stratosphereips.org/ludus", "green"))
 #print("For starting the tool, type 'COMMAND TODO'.")
