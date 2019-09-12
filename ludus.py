@@ -330,6 +330,7 @@ class Ludus(object):
         output["flows"] = flows
         output["instance_hash"] = self.instance_hash
         output["GameStrategyFileName"] = self.strategy_file.split("/")[-1]
+        output["timezone"] = time.tzname[0]
         return output
 
     def run(self):
