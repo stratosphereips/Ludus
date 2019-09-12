@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 #  Copyright (C) 2017  Sebastian Garcia, Ondrej Lukas
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -32,12 +32,15 @@ import msgpack
 import sched
 import os
 import signal
+import pickle
+import json
+import requests
 import Suricata_Extractor.suricata_extractor_for_ludus as s_extractor
 from multiprocessing import Process
 from argparse import ArgumentParser
 from configparser import ConfigParser,NoOptionError
-import pickle
-import json
+
+
 
 VERSION = "0.9"
 
@@ -153,13 +156,71 @@ class Ludus(object):
         self.next_call = 0
         self.suricata_pid = None
         self.read_configuration()
-        self.logger = Logger(log_file)
+        self.strategy_timestamp = 0
+
+    def check_strategy_update(self, verify=True):
+        try:
+            #get the information about the strategy
+            r = requests.head(self.strategy_url, verify=verify)
+            if r.status_code == 200:
+                last_modified_url = r.headers["Last-Modified"].strip('\"')
+                last_modified_url_dt = datetime.datetime.utcfromtimestamp(datetime.datetime.strptime(last_modified_url, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=datetime.timezone.utc).timestamp())
+                
+                current_strategy_dt = datetime.datetime.utcfromtimestamp(self.strategy_timestamp.replace(tzinfo=datetime.timezone.utc).timestamp())
+                #compare the timestamps
+                if current_strategy_dt < last_modified_url_dt:
+                    tmp_file = "/tmp/tmp.gpg"
+                    self.logger.log_event(f"New strategy available! Initializing update.")
+                    r = requests.get(self.strategy_url, verify=verify)
+                    open(tmp_file, 'wb').write(r.content)
+                    #import the key
+                    if subprocess.run(["gpg", "--import", "/etc/ludus/ludus-public-key.asc"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+                        #check signature
+                        if subprocess.run(["gpg", "--verify", tmp_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
+                            # decrypt it and store
+                            r = subprocess.run(["gpg", "--decrypt", tmp_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                            if r.returncode == 0:
+                                filename = None
+                                #check if the format is correct
+                                for line in r.stdout.decode("utf-8").split("\n"):
+                                    if "# name:" in line:
+                                        filename = line.lstrip("# name:")
+                                if filename:
+                                    with open(os.path.join(self.strategy_dir, filename), "wb") as f:
+                                        f.write(r.stdout)
+                                    #remove the tmp_file
+                                    os.remove(tmp_file)
+                                    self.strategy_timestamp = last_modified_url_dt
+                                    self.update_strategy_name(filename)
+                                    self.logger.log_event(f"Strategy updated! New strategy: '{filename}'")
+                                else:
+                                    self.logger.log_event(f"Error - Invalid format of the strategy file! Strategy update skipped.")
+                            else:
+                                self.logger.log_event(f"Error - Could not decrypt the file using the Ludus key! Strategy update skipped.")
+                        else:
+                            self.logger.log_event(f"Error - File not signed by Ludus! Strategy update skipped.")
+                    else:
+                        self.logger.log_event(f"Error - Problem with the gpg key: '/etc/ludus/ludus-public-key.asc'")
+            else:
+                self.logger.log_event(f"Error while accesing the strategy URL - Status code:{r.status_code}")
+        except requests.exceptions.HTTPError:
+            #log it
+            self.logger.log_event(f"HTTPError while accesing the strategy webpage:'{strategy_url}'! Strategy update skipped.")
+            pass
+    def update_strategy_name(self, new_name):
+        self.strategy_file = os.path.join(self.strategy_dir, new_name)
+        self.config_parser.set("strategy","filename", str(new_name))
+        with open(self.config_file, 'w') as configfile:
+            self.config_parser.write(configfile)
 
     def read_configuration(self):
         """Reads values in ludus.conf and updates the settings accordily"""
         self.config_parser.read(self.config_file)
-        #get strategy file
+        #get strategy file and modified timestamp
         self.strategy_file = os.path.join(self.config_parser.get("strategy", "strategy_dir"),self.config_parser.get("strategy", "filename"))
+        self.strategy_timestamp = datetime.datetime.utcfromtimestamp(os.path.getmtime(self.strategy_file))
+        self.strategy_dir = self.config_parser.get("strategy", "strategy_dir")
+
         try:
             self.tw_length = self.config_parser.getint("settings", "timeout")*60
         except configparser.NoOptionError:
@@ -205,6 +266,10 @@ class Ludus(object):
             self.instance_hash = self.config_parser.get("settings","installation_hash")
         except ValueError:
             self.instance_hash = "Unknown"
+        try:
+            self.strategy_url = self.config_parser.get("strategy","strategy_url")
+        except (ValueError, NoOptionError) as e:
+            self.strategy_url = "http://147.32.80.119:443/newest.gpg"
         
     def apply_strategy(self, suggested_honeypots,known_honeypots=['22', '23', '8080', '2323', '80', '3128', '8123']):
         #close previously opened HP which we do not want anymore
@@ -220,7 +285,7 @@ class Ludus(object):
         try:
             #open the Honeypots on suggested ports
             for port in suggested_honeypots:
-                if not self.active_honeypot or port not in self.active_honeypots:
+                if not self.active_honeypots or port not in self.active_honeypots:
                     open_honeypot(port[1],port[0],known_honeypots)
         except TypeError:
             #no action required
@@ -288,6 +353,8 @@ class Ludus(object):
         self.next_call += self.tw_length #this helps to avoid drifting in time windows
         next_start = self.tw_end
         old_strategy = self.strategy_file
+        #check if there is strategy update
+        self.check_strategy_update()
         #check if there is any change configuration
         self.read_configuration()
 
@@ -314,6 +381,7 @@ class Ludus(object):
     def start(self):
         # read configuration file
         self.read_configuration()
+        self.check_strategy_update()
         #create dir for logs
         try:
             os.makedirs(self.suricata_logdir)
