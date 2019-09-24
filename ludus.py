@@ -203,9 +203,10 @@ class Ludus(object):
                         self.logger.log_event(f"Error - Problem with the gpg key: '/etc/ludus/ludus-public-key.asc'")
             else:
                 self.logger.log_event(f"Error while accesing the strategy URL - Status code:{r.status_code}")
-        except requests.exceptions.HTTPError:
+        except requests.exceptions.RequestException as e:
             #log it
             self.logger.log_event(f"HTTPError while accesing the strategy webpage:'{strategy_url}'! Strategy update skipped.")
+            self.logger.log_event(f"Excetion detail: {e}")
             pass
     def update_strategy_name(self, new_name):
         self.strategy_file = os.path.join(self.strategy_dir, new_name)
